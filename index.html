@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>סוכן החופשות החכם</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: linear-gradient(160deg, #e0f7ff 0%, #bae6fd 35%, #7dd3fc 65%, #38bdf8 100%);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    position: relative; overflow: hidden;
+  }
+
+  /* ── Background scene ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,255,255,0.6) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 30% at 20% 80%, rgba(56,189,248,0.25) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 25% at 80% 70%, rgba(186,230,253,0.3) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Clouds */
+  .cloud {
+    position: fixed; z-index: 0; pointer-events: none;
+    background: rgba(255,255,255,0.82);
+    border-radius: 50px;
+    filter: blur(2px);
+    animation: cloud-drift linear infinite;
+  }
+  .cloud::before, .cloud::after {
+    content: ''; position: absolute;
+    background: rgba(255,255,255,0.82);
+    border-radius: 50%;
+  }
+  @keyframes cloud-drift {
+    from { transform: translateX(-120%); }
+    to   { transform: translateX(110vw); }
+  }
+
+  /* Airplane trail */
+  .plane-trail {
+    position: fixed; z-index: 0; pointer-events: none;
+    font-size: 28px;
+    animation: fly-across 18s linear infinite;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12));
+  }
+  @keyframes fly-across {
+    0%   { transform: translateX(-80px) translateY(0); opacity: 0; }
+    5%   { opacity: 1; }
+    95%  { opacity: 1; }
+    100% { transform: translateX(110vw) translateY(-40px); opacity: 0; }
+  }
+  .plane-trail::after {
+    content: '';
+    position: absolute; right: 100%; top: 50%;
+    width: 120px; height: 2px;
+    background: linear-gradient(to left, rgba(255,255,255,0.8), transparent);
+    transform: translateY(-50%);
+  }
+
+  /* Sun */
+  .sun {
+    position: fixed; top: 40px; right: 80px; z-index: 0;
+    width: 80px; height: 80px; pointer-events: none;
+    background: radial-gradient(circle, #fde68a 40%, #fbbf24 70%, transparent 100%);
+    border-radius: 50%;
+    box-shadow: 0 0 40px 20px rgba(251,191,36,0.2);
+    animation: sun-pulse 4s ease-in-out infinite;
+  }
+  @keyframes sun-pulse {
+    0%,100%{box-shadow:0 0 40px 20px rgba(251,191,36,0.2)}
+    50%{box-shadow:0 0 60px 30px rgba(251,191,36,0.3)}
+  }
+
+  /* Birds */
+  .bird { position: fixed; z-index: 0; pointer-events: none; font-size: 18px; opacity: 0.55; animation: bird-fly linear infinite; }
+  @keyframes bird-fly {
+    from { transform: translateX(-60px) translateY(0); }
+    to   { transform: translateX(110vw) translateY(-20px); }
+  }
+  .chat-container { position: relative; z-index: 10;
+    width: 100%; max-width: 680px;
+    background: rgba(10,30,45,0.75);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px; overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.4);
+    display: flex; flex-direction: column;
+    height: 90vh; max-height: 750px;
+  }
+  .chat-header {
+    background: linear-gradient(90deg, #1a6b8a, #2e86ab);
+    padding: 20px 24px;
+    display: flex; align-items: center; gap: 14px;
+    flex-shrink: 0;
+  }
+  .agent-avatar {
+    width: 48px; height: 48px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .agent-info h1 { color: #fff; font-size: 18px; font-weight: 700; }
+  .agent-info p  { color: rgba(255,255,255,0.7); font-size: 13px; margin-top: 2px; }
+  .status-dot {
+    width: 8px; height: 8px; background: #4ade80;
+    border-radius: 50%; display: inline-block; margin-left: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .messages {
+    flex: 1; overflow-y: auto;
+    padding: 20px; display: flex; flex-direction: column; gap: 14px;
+    scroll-behavior: smooth;
+  }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+  .msg {
+    display: flex; flex-direction: column;
+    max-width: 82%; animation: fadeUp 0.3s ease;
+  }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .msg.bot  { align-self: flex-end; }
+  .msg.user { align-self: flex-start; }
+
+  .msg-bubble {
+    padding: 12px 16px; border-radius: 18px;
+    font-size: 15px; line-height: 1.6; white-space: pre-wrap;
+  }
+  .msg.bot .msg-bubble {
+    background: linear-gradient(135deg, #155e7a, #1e7fa8);
+    color: #fff; border-bottom-right-radius: 4px;
+  }
+  .msg.user .msg-bubble {
+    background: rgba(255,255,255,0.18); color: #fff;
+    border-bottom-left-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.3);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  .quick-replies { display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;justify-content:flex-end; }
+  .quick-btn {
+    background: rgba(46,134,171,0.3); color: #fff;
+    border: 1px solid rgba(46,134,171,0.6); border-radius: 20px;
+    padding: 7px 16px; font-size: 13px;
+    font-family: 'Heebo', sans-serif; cursor: pointer; transition: all 0.2s;
+  }
+  .quick-btn:hover { background: rgba(46,134,171,0.6); transform: translateY(-1px); }
+
+  .destinations-grid {
+    display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr));
+    gap: 8px; margin-top: 10px; width: 100%;
+  }
+  .dest-card {
+    background: rgba(10,30,50,0.65);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px; padding: 10px 12px;
+    cursor: pointer; transition: all 0.2s; text-align: right;
+  }
+  .dest-card:hover {
+    background: rgba(46,134,171,0.3);
+    border-color: rgba(46,134,171,0.6); transform: translateY(-2px);
+  }
+  .dest-card .city { font-size: 14px; font-weight: 600; color: #fff; }
+  .dest-card .country { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+  .dest-card .link-btn {
+    display: inline-block; margin-top: 6px; font-size: 11px;
+    color: #7dd3fc; text-decoration: none;
+  }
+  .dest-card .link-btn:hover { color: #38bdf8; }
+
+  .winner-card {
+    background: linear-gradient(135deg,rgba(120,80,10,0.6),rgba(160,100,10,0.5));
+    border: 2px solid rgba(251,191,36,0.5); border-radius: 16px;
+    padding: 16px; text-align: center; margin-top: 8px;
+    animation: glow 1s ease;
+  }
+  @keyframes glow {
+    0%{box-shadow:0 0 0 rgba(251,191,36,0)}
+    50%{box-shadow:0 0 30px rgba(251,191,36,0.4)}
+    100%{box-shadow:0 0 0 rgba(251,191,36,0)}
+  }
+  .winner-card .emoji { font-size: 40px; }
+  .winner-card .city-name { font-size: 22px; font-weight: 700; color: #fbbf24; margin-top: 8px; }
+  .winner-card .country-name { font-size: 15px; color: rgba(255,255,255,0.7); }
+
+  .typing {
+    display: flex; gap: 5px; align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #155e7a, #1e7fa8);
+    border-radius: 18px; border-bottom-right-radius: 4px;
+    width: fit-content; align-self: flex-end;
+  }
+  .typing span {
+    width: 7px; height: 7px; background: rgba(255,255,255,0.7);
+    border-radius: 50%; animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2){animation-delay:0.2s}
+  .typing span:nth-child(3){animation-delay:0.4s}
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+  .input-area {
+    padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.15); background: rgba(8,25,38,0.6);
+    display: flex; gap: 10px; flex-shrink: 0;
+  }
+  #user-input {
+    flex: 1;
+    background: rgba(10,30,45,0.6);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 24px; padding: 11px 18px;
+    color: #fff; font-size: 15px;
+    font-family: 'Heebo', sans-serif;
+    outline: none; transition: border-color 0.2s; text-align: right;
+  }
+  #user-input::placeholder { color: rgba(255,255,255,0.4); }
+  #user-input:focus { border-color: rgba(46,134,171,0.6); }
+  #send-btn {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, #155e7a, #1e7fa8);
+    border: none; border-radius: 50%; color: #fff; font-size: 18px;
+    cursor: pointer; transition: transform 0.2s; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #send-btn:hover { transform: scale(1.08); }
+  #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<!-- Sun -->
+<div class="sun"></div>
+
+<!-- Clouds -->
+<div class="cloud" style="width:200px;height:50px;top:8%;animation-duration:40s;animation-delay:0s;opacity:0.9">
+  <div style="position:absolute;width:100px;height:80px;background:rgba(255,255,255,0.82);border-radius:50%;top:-40px;left:30px"></div>
+  <div style="position:absolute;width:70px;height:60px;background:rgba(255,255,255,0.82);border-radius:50%;top:-28px;left:80px"></div>
+</div>
+<div class="cloud" style="width:140px;height:38px;top:18%;animation-duration:55s;animation-delay:-20s;opacity:0.75">
+  <div style="position:absolute;width:80px;height:65px;background:rgba(255,255,255,0.82);border-radius:50%;top:-32px;left:20px"></div>
+</div>
+<div class="cloud" style="width:240px;height:55px;top:35%;animation-duration:70s;animation-delay:-35s;opacity:0.65">
+  <div style="position:absolute;width:110px;height:90px;background:rgba(255,255,255,0.82);border-radius:50%;top:-45px;left:40px"></div>
+  <div style="position:absolute;width:80px;height:65px;background:rgba(255,255,255,0.82);border-radius:50%;top:-30px;left:100px"></div>
+</div>
+<div class="cloud" style="width:160px;height:42px;top:60%;animation-duration:50s;animation-delay:-10s;opacity:0.6">
+  <div style="position:absolute;width:90px;height:72px;background:rgba(255,255,255,0.82);border-radius:50%;top:-36px;left:25px"></div>
+</div>
+
+<!-- Airplanes -->
+<div class="plane-trail" style="top:12%;animation-duration:18s;animation-delay:0s">✈️</div>
+<div class="plane-trail" style="top:45%;animation-duration:26s;animation-delay:-10s;font-size:20px;opacity:0.6">✈️</div>
+
+<!-- Birds -->
+<div class="bird" style="top:22%;animation-duration:22s;animation-delay:-5s">🐦</div>
+<div class="bird" style="top:28%;animation-duration:28s;animation-delay:-12s;font-size:14px">🐦</div>
+<div class="bird" style="top:70%;animation-duration:35s;animation-delay:-18s;font-size:22px">🦅</div>
+
+<div class="chat-container">
+  <div class="chat-header">
+    <div class="agent-avatar">✈️</div>
+    <div class="agent-info">
+      <h1>סוכן החופשות החכם <span class="status-dot"></span></h1>
+      <p>מוצא לך את החופשה המושלמת</p>
+    </div>
+  </div>
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <button id="send-btn" onclick="sendMsg()">➤</button>
+    <input type="text" id="user-input" placeholder="כתוב כאן..." onkeydown="if(event.key==='Enter')sendMsg()">
+  </div>
+</div>
+
+<script>
+
+
+
+const DESTINATIONS = [{"country":"Algeria","city":"Algiers","region":"Africa","style":"Winter","budget":"Low"},{"country":"Algeria","city":"Algiers","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Algeria","city":"Algiers","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Burundi","city":"Bujumbura","region":"Africa","style":"Winter","budget":"Low"},{"country":"Benin","city":"Cotonou","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Benin","city":"Cotonou","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Benin","city":"Cotonou","region":"Africa","style":"Winter","budget":"Low"},{"country":"Central African Republic","city":"Bangui","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Central African Republic","city":"Bangui","region":"Africa","style":"Winter","budget":"Low"},{"country":"Central African Republic","city":"Bangui","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Congo","city":"Brazzaville","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Congo","city":"Brazzaville","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Congo","city":"Brazzaville","region":"Africa","style":"Winter","budget":"Low"},{"country":"Egypt","city":"Cairo","region":"Africa","style":"Urban/City","budget":"Medium"},{"country":"Egypt","city":"Cairo","region":"Africa","style":"Winter","budget":"Medium"},{"country":"Egypt","city":"Cairo","region":"Africa","style":"Tropical","budget":"Medium"},{"country":"Ethiopia","city":"Addis Ababa","region":"Africa","style":"Winter","budget":"Low"},{"country":"Ethiopia","city":"Addis Ababa","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Gabon","city":"Libreville","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Gabon","city":"Libreville","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Gabon","city":"Libreville","region":"Africa","style":"Winter","budget":"Low"},{"country":"Gambia","city":"Banjul","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Gambia","city":"Banjul","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Gambia","city":"Banjul","region":"Africa","style":"Winter","budget":"Low"},{"country":"Guinea","city":"Conakry","region":"Africa","style":"Winter","budget":"Low"},{"country":"Guinea","city":"Conakry","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Guinea","city":"Conakry","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Guinea-Bissau","city":"Bissau","region":"Africa","style":"Winter","budget":"Low"},{"country":"Ivory Coast","city":"Abidjan","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Ivory Coast","city":"Abidjan","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Ivory Coast","city":"Abidjan","region":"Africa","style":"Winter","budget":"Low"},{"country":"Kenya","city":"Nairobi","region":"Africa","style":"Winter","budget":"Low"},{"country":"Kenya","city":"Nairobi","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Morocco","city":"Rabat","region":"Africa","style":"Winter","budget":"Low"},{"country":"Morocco","city":"Rabat","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Morocco","city":"Rabat","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Madagascar","city":"Antananarivo","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Madagascar","city":"Antananarivo","region":"Africa","style":"Winter","budget":"Low"},{"country":"Mauritania","city":"Nouakchott","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Mauritania","city":"Nouakchott","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Mauritania","city":"Nouakchott","region":"Africa","style":"Winter","budget":"Low"},{"country":"Malawi","city":"Lilongwe","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Malawi","city":"Lilongwe","region":"Africa","style":"Winter","budget":"Low"},{"country":"Mozambique","city":"Maputo","region":"Africa","style":"Winter","budget":"Low"},{"country":"Mozambique","city":"Maputo","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Mozambique","city":"Maputo","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Namibia","city":"Windhoek","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Namibia","city":"Windhoek","region":"Africa","style":"Winter","budget":"Low"},{"country":"Namibia","city":"Windhoek","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Nigeria","city":"Niamey","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Nigeria","city":"Niamey","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Nigeria","city":"Niamey","region":"Africa","style":"Winter","budget":"Low"},{"country":"Nigeria","city":"Lagos","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Nigeria","city":"Lagos","region":"Africa","style":"Winter","budget":"Low"},{"country":"Nigeria","city":"Lagos","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Senegal","city":"Dakar","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Senegal","city":"Dakar","region":"Africa","style":"Winter","budget":"Low"},{"country":"Senegal","city":"Dakar","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Sierra Leone","city":"Freetown","region":"Africa","style":"Winter","budget":"Low"},{"country":"South Africa","city":"Capetown","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"South Africa","city":"Capetown","region":"Africa","style":"Winter","budget":"Low"},{"country":"Togo","city":"Lome","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Togo","city":"Lome","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Togo","city":"Lome","region":"Africa","style":"Winter","budget":"Low"},{"country":"Tunisia","city":"Tunis","region":"Africa","style":"Winter","budget":"Medium"},{"country":"Tunisia","city":"Tunis","region":"Africa","style":"Urban/City","budget":"Medium"},{"country":"Tunisia","city":"Tunis","region":"Africa","style":"Tropical","budget":"Medium"},{"country":"Tanzania","city":"Dar Es Salaam","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Tanzania","city":"Dar Es Salaam","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Tanzania","city":"Dar Es Salaam","region":"Africa","style":"Winter","budget":"Low"},{"country":"Uganda","city":"Kampala","region":"Africa","style":"Winter","budget":"Low"},{"country":"Uganda","city":"Kampala","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Zambia","city":"Lusaka","region":"Africa","style":"Winter","budget":"Low"},{"country":"Zambia","city":"Lusaka","region":"Africa","style":"Urban/City","budget":"Low"},{"country":"Zambia","city":"Lusaka","region":"Africa","style":"Tropical","budget":"Low"},{"country":"Bangladesh","city":"Dhaka","region":"Asia","style":"Winter","budget":"Low"},{"country":"Bangladesh","city":"Dhaka","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Bangladesh","city":"Dhaka","region":"Asia","style":"Tropical","budget":"Low"},{"country":"China","city":"Beijing","region":"Asia","style":"Winter","budget":"Low"},{"country":"China","city":"Beijing","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"China","city":"Beijing","region":"Asia","style":"Tropical","budget":"Low"},{"country":"China","city":"Chengdu","region":"Asia","style":"Winter","budget":"Low"},{"country":"China","city":"Chengdu","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"China","city":"Chengdu","region":"Asia","style":"Tropical","budget":"Low"},{"country":"China","city":"Guangzhou","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"China","city":"Guangzhou","region":"Asia","style":"Winter","budget":"Low"},{"country":"China","city":"Guangzhou","region":"Asia","style":"Tropical","budget":"Low"},{"country":"China","city":"Shanghai","region":"Asia","style":"Winter","budget":"Low"},{"country":"China","city":"Shanghai","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"China","city":"Shanghai","region":"Asia","style":"Tropical","budget":"Low"},{"country":"China","city":"Shenyang","region":"Asia","style":"Winter","budget":"Low"},{"country":"China","city":"Shenyang","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"China","city":"Shenyang","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Hong Kong","city":"Hong Kong","region":"Asia","style":"Urban/City","budget":"Medium"},{"country":"Hong Kong","city":"Hong Kong","region":"Asia","style":"Winter","budget":"Medium"},{"country":"Hong Kong","city":"Hong Kong","region":"Asia","style":"Tropical","budget":"Medium"},{"country":"India","city":"Bombay (Mumbai)","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"India","city":"Bombay (Mumbai)","region":"Asia","style":"Tropical","budget":"Low"},{"country":"India","city":"Calcutta","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"India","city":"Calcutta","region":"Asia","style":"Tropical","budget":"Low"},{"country":"India","city":"Chennai (Madras)","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"India","city":"Chennai (Madras)","region":"Asia","style":"Tropical","budget":"Low"},{"country":"India","city":"Delhi","region":"Asia","style":"Winter","budget":"Medium"},{"country":"India","city":"Delhi","region":"Asia","style":"Urban/City","budget":"Medium"},{"country":"India","city":"Delhi","region":"Asia","style":"Tropical","budget":"Medium"},{"country":"Indonesia","city":"Jakarta","region":"Asia","style":"Winter","budget":"Medium"},{"country":"Indonesia","city":"Jakarta","region":"Asia","style":"Urban/City","budget":"Medium"},{"country":"Indonesia","city":"Jakarta","region":"Asia","style":"Tropical","budget":"Medium"},{"country":"Japan","city":"Osaka","region":"Asia","style":"Winter","budget":"Low"},{"country":"Japan","city":"Osaka","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Japan","city":"Osaka","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Japan","city":"Sapporo","region":"Asia","style":"Winter","budget":"Low"},{"country":"Japan","city":"Sapporo","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Japan","city":"Tokyo","region":"Asia","style":"Winter","budget":"Medium"},{"country":"Japan","city":"Tokyo","region":"Asia","style":"Urban/City","budget":"Medium"},{"country":"Japan","city":"Tokyo","region":"Asia","style":"Tropical","budget":"Medium"},{"country":"Kazakhstan","city":"Almaty","region":"Asia","style":"Winter","budget":"Medium"},{"country":"Kazakhstan","city":"Almaty","region":"Asia","style":"Urban/City","budget":"Medium"},{"country":"Kazakhstan","city":"Almaty","region":"Asia","style":"Tropical","budget":"Medium"},{"country":"Kyrgyzstan","city":"Bishkek","region":"Asia","style":"Winter","budget":"Low"},{"country":"Kyrgyzstan","city":"Bishkek","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Kyrgyzstan","city":"Bishkek","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Laos","city":"Vientiane","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Laos","city":"Vientiane","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Malaysia","city":"Kuala Lumpur","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Malaysia","city":"Kuala Lumpur","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Malaysia","city":"Kuala Lumpur","region":"Asia","style":"Winter","budget":"Low"},{"country":"Mongolia","city":"Ulan-bator","region":"Asia","style":"Winter","budget":"Low"},{"country":"Mongolia","city":"Ulan-bator","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Myanmar (Burma)","city":"Rangoon","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Myanmar (Burma)","city":"Rangoon","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Myanmar (Burma)","city":"Rangoon","region":"Asia","style":"Winter","budget":"Low"},{"country":"Nepal","city":"Katmandu","region":"Asia","style":"Winter","budget":"Low"},{"country":"Nepal","city":"Katmandu","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"North Korea","city":"Pyongyang","region":"Asia","style":"Winter","budget":"Low"},{"country":"North Korea","city":"Pyongyang","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"North Korea","city":"Pyongyang","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Pakistan","city":"Islamabad","region":"Asia","style":"Winter","budget":"Low"},{"country":"Pakistan","city":"Islamabad","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Pakistan","city":"Islamabad","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Pakistan","city":"Karachi","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Pakistan","city":"Karachi","region":"Asia","style":"Winter","budget":"Low"},{"country":"Pakistan","city":"Karachi","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Philippines","city":"Manila","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Philippines","city":"Manila","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Singapore","city":"Singapore","region":"Asia","style":"Tropical","budget":"Medium"},{"country":"Singapore","city":"Singapore","region":"Asia","style":"Urban/City","budget":"Medium"},{"country":"South Korea","city":"Seoul","region":"Asia","style":"Winter","budget":"Low"},{"country":"South Korea","city":"Seoul","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"South Korea","city":"Seoul","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Sri Lanka","city":"Colombo","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Sri Lanka","city":"Colombo","region":"Asia","style":"Winter","budget":"Low"},{"country":"Sri Lanka","city":"Colombo","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Taiwan","city":"Taipei","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Taiwan","city":"Taipei","region":"Asia","style":"Winter","budget":"Low"},{"country":"Taiwan","city":"Taipei","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Tajikistan","city":"Dusanbe","region":"Asia","style":"Winter","budget":"Low"},{"country":"Tajikistan","city":"Dusanbe","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Tajikistan","city":"Dusanbe","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Thailand","city":"Bangkok","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Thailand","city":"Bangkok","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Turkmenistan","city":"Ashabad","region":"Asia","style":"Winter","budget":"Low"},{"country":"Turkmenistan","city":"Ashabad","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Turkmenistan","city":"Ashabad","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Uzbekistan","city":"Tashkent","region":"Asia","style":"Winter","budget":"Low"},{"country":"Uzbekistan","city":"Tashkent","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Uzbekistan","city":"Tashkent","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Vietnam","city":"Hanoi","region":"Asia","style":"Urban/City","budget":"Low"},{"country":"Vietnam","city":"Hanoi","region":"Asia","style":"Winter","budget":"Low"},{"country":"Vietnam","city":"Hanoi","region":"Asia","style":"Tropical","budget":"Low"},{"country":"Australia","city":"Brisbane","region":"Australia/South Pacific","style":"Urban/City","budget":"Low"},{"country":"Australia","city":"Brisbane","region":"Australia/South Pacific","style":"Tropical","budget":"Low"},{"country":"Australia","city":"Brisbane","region":"Australia/South Pacific","style":"Winter","budget":"Low"},{"country":"Australia","city":"Canberra","region":"Australia/South Pacific","style":"Winter","budget":"Low"},{"country":"Australia","city":"Canberra","region":"Australia/South Pacific","style":"Urban/City","budget":"Low"},{"country":"Australia","city":"Melbourne","region":"Australia/South Pacific","style":"Urban/City","budget":"High"},{"country":"Australia","city":"Melbourne","region":"Australia/South Pacific","style":"Winter","budget":"High"},{"country":"Australia","city":"Melbourne","region":"Australia/South Pacific","style":"Tropical","budget":"High"},{"country":"Australia","city":"Perth","region":"Australia/South Pacific","style":"Tropical","budget":"Medium"},{"country":"Australia","city":"Perth","region":"Australia/South Pacific","style":"Urban/City","budget":"Medium"},{"country":"Australia","city":"Perth","region":"Australia/South Pacific","style":"Winter","budget":"Medium"},{"country":"Australia","city":"Sydney","region":"Australia/South Pacific","style":"Winter","budget":"Medium"},{"country":"Australia","city":"Sydney","region":"Australia/South Pacific","style":"Urban/City","budget":"Medium"},{"country":"Australia","city":"Sydney","region":"Australia/South Pacific","style":"Tropical","budget":"Medium"},{"country":"New Zealand","city":"Auckland","region":"Australia/South Pacific","style":"Urban/City","budget":"Medium"},{"country":"New Zealand","city":"Auckland","region":"Australia/South Pacific","style":"Winter","budget":"Medium"},{"country":"Albania","city":"Tirana","region":"Europe","style":"Winter","budget":"Low"},{"country":"Albania","city":"Tirana","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Albania","city":"Tirana","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Austria","city":"Vienna","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Austria","city":"Vienna","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Belarus","city":"Minsk","region":"Europe","style":"Winter","budget":"Low"},{"country":"Belarus","city":"Minsk","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Belgium","city":"Brussels","region":"Europe","style":"Winter","budget":"Low"},{"country":"Belgium","city":"Brussels","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Bulgaria","city":"Sofia","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Bulgaria","city":"Sofia","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Bulgaria","city":"Sofia","region":"Europe","style":"Tropical","budget":"Medium"},{"country":"Croatia","city":"Zagreb","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Croatia","city":"Zagreb","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Croatia","city":"Zagreb","region":"Europe","style":"Tropical","budget":"Medium"},{"country":"Cyprus","city":"Nicosia","region":"Europe","style":"Winter","budget":"Low"},{"country":"Cyprus","city":"Nicosia","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Cyprus","city":"Nicosia","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Czech Republic","city":"Prague","region":"Europe","style":"Winter","budget":"Low"},{"country":"Czech Republic","city":"Prague","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Denmark","city":"Copenhagen","region":"Europe","style":"Winter","budget":"High"},{"country":"Denmark","city":"Copenhagen","region":"Europe","style":"Urban/City","budget":"High"},{"country":"Finland","city":"Helsinki","region":"Europe","style":"Winter","budget":"Low"},{"country":"Finland","city":"Helsinki","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"France","city":"Paris","region":"Europe","style":"Winter","budget":"Low"},{"country":"France","city":"Paris","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"France","city":"Paris","region":"Europe","style":"Tropical","budget":"Low"},{"country":"France","city":"Bordeaux","region":"Europe","style":"Winter","budget":"Low"},{"country":"France","city":"Bordeaux","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"France","city":"Bordeaux","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Germany","city":"Bonn","region":"Europe","style":"Winter","budget":"Low"},{"country":"Germany","city":"Bonn","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Germany","city":"Bonn","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Germany","city":"Frankfurt","region":"Europe","style":"Winter","budget":"High"},{"country":"Germany","city":"Frankfurt","region":"Europe","style":"Urban/City","budget":"High"},{"country":"Germany","city":"Frankfurt","region":"Europe","style":"Tropical","budget":"High"},{"country":"Germany","city":"Hamburg","region":"Europe","style":"Winter","budget":"Low"},{"country":"Germany","city":"Hamburg","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Germany","city":"Munich","region":"Europe","style":"Winter","budget":"Low"},{"country":"Germany","city":"Munich","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Georgia","city":"Tbilisi","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Georgia","city":"Tbilisi","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Georgia","city":"Tbilisi","region":"Europe","style":"Tropical","budget":"Medium"},{"country":"Greece","city":"Athens","region":"Europe","style":"Winter","budget":"Low"},{"country":"Greece","city":"Athens","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Greece","city":"Athens","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Hungary","city":"Budapest","region":"Europe","style":"Winter","budget":"Low"},{"country":"Hungary","city":"Budapest","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Hungary","city":"Budapest","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Iceland","city":"Reykjavik","region":"Europe","style":"Winter","budget":"Low"},{"country":"Ireland","city":"Dublin","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Ireland","city":"Dublin","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Italy","city":"Milan","region":"Europe","style":"Winter","budget":"Low"},{"country":"Italy","city":"Milan","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Italy","city":"Rome","region":"Europe","style":"Winter","budget":"Low"},{"country":"Italy","city":"Rome","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Latvia","city":"Riga","region":"Europe","style":"Winter","budget":"Low"},{"country":"Latvia","city":"Riga","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Macedonia","city":"Skopje","region":"Europe","style":"Winter","budget":"Low"},{"country":"Macedonia","city":"Skopje","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Macedonia","city":"Skopje","region":"Europe","style":"Tropical","budget":"Low"},{"country":"The Netherlands","city":"Amsterdam","region":"Europe","style":"Winter","budget":"Medium"},{"country":"The Netherlands","city":"Amsterdam","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Norway","city":"Oslo","region":"Europe","style":"Winter","budget":"Low"},{"country":"Norway","city":"Oslo","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Poland","city":"Warsaw","region":"Europe","style":"Winter","budget":"Low"},{"country":"Poland","city":"Warsaw","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Portugal","city":"Lisbon","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Portugal","city":"Lisbon","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Portugal","city":"Lisbon","region":"Europe","style":"Tropical","budget":"Medium"},{"country":"Romania","city":"Bucharest","region":"Europe","style":"Winter","budget":"Low"},{"country":"Romania","city":"Bucharest","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Romania","city":"Bucharest","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Russia","city":"Moscow","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Russia","city":"Moscow","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Russia","city":"Yerevan","region":"Europe","style":"Winter","budget":"High"},{"country":"Russia","city":"Yerevan","region":"Europe","style":"Urban/City","budget":"High"},{"country":"Russia","city":"Yerevan","region":"Europe","style":"Tropical","budget":"High"},{"country":"Serbia-Montenegro","city":"Pristina","region":"Europe","style":"Winter","budget":"Low"},{"country":"Serbia-Montenegro","city":"Pristina","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Serbia-Montenegro","city":"Pristina","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Slovakia","city":"Bratislava","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Slovakia","city":"Bratislava","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Slovakia","city":"Bratislava","region":"Europe","style":"Tropical","budget":"Medium"},{"country":"Spain","city":"Barcelona","region":"Europe","style":"Winter","budget":"Low"},{"country":"Spain","city":"Barcelona","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Spain","city":"Bilbao","region":"Europe","style":"Winter","budget":"Low"},{"country":"Spain","city":"Bilbao","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Spain","city":"Bilbao","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Spain","city":"Madrid","region":"Europe","style":"Winter","budget":"Low"},{"country":"Spain","city":"Madrid","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Spain","city":"Madrid","region":"Europe","style":"Tropical","budget":"Low"},{"country":"Sweden","city":"Stockholm","region":"Europe","style":"Winter","budget":"Low"},{"country":"Sweden","city":"Stockholm","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Switzerland","city":"Bern","region":"Europe","style":"Winter","budget":"Low"},{"country":"Switzerland","city":"Bern","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Switzerland","city":"Geneva","region":"Europe","style":"Winter","budget":"Low"},{"country":"Switzerland","city":"Geneva","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Switzerland","city":"Zurich","region":"Europe","style":"Winter","budget":"Medium"},{"country":"Switzerland","city":"Zurich","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Ukraine","city":"Kiev","region":"Europe","style":"Winter","budget":"Low"},{"country":"Ukraine","city":"Kiev","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"Ukraine","city":"Kiev","region":"Europe","style":"Tropical","budget":"Low"},{"country":"United Kingdom","city":"Belfast","region":"Europe","style":"Winter","budget":"Low"},{"country":"United Kingdom","city":"Belfast","region":"Europe","style":"Urban/City","budget":"Low"},{"country":"United Kingdom","city":"London","region":"Europe","style":"Winter","budget":"Medium"},{"country":"United Kingdom","city":"London","region":"Europe","style":"Urban/City","budget":"Medium"},{"country":"Yugoslavia","city":"Belgrade","region":"Europe","style":"Winter","budget":"High"},{"country":"Yugoslavia","city":"Belgrade","region":"Europe","style":"Urban/City","budget":"High"},{"country":"Yugoslavia","city":"Belgrade","region":"Europe","style":"Tropical","budget":"High"},{"country":"Bahrain","city":"Manama","region":"Middle East","style":"Urban/City","budget":"Low"},{"country":"Bahrain","city":"Manama","region":"Middle East","style":"Winter","budget":"Low"},{"country":"Bahrain","city":"Manama","region":"Middle East","style":"Tropical","budget":"Low"},{"country":"Israel","city":"Tel Aviv","region":"Middle East","style":"Urban/City","budget":"Low"},{"country":"Israel","city":"Tel Aviv","region":"Middle East","style":"Winter","budget":"Low"},{"country":"Israel","city":"Tel Aviv","region":"Middle East","style":"Tropical","budget":"Low"}];
+
+const HEB_CITY = {
+  'פריז':'Paris','לונדון':'London','ברלין':'Berlin','רומא':'Rome','מדריד':'Madrid',
+  'ברצלונה':'Barcelona','אמסטרדם':'Amsterdam','וינה':'Vienna','פראג':'Prague',
+  'בודפשט':'Budapest','ורשה':'Warsaw','אתונה':'Athens','לישבון':'Lisbon',
+  'דבלין':'Dublin','סטוקהולם':'Stockholm','אוסלו':'Oslo','קופנהגן':'Copenhagen',
+  'הלסינקי':'Helsinki','זגרב':'Zagreb','בוקרשט':'Bucharest','סופיה':'Sofia',
+  'בלגרד':'Belgrade','מינסק':'Minsk','מוסקבה':'Moscow','קייב':'Kiev',
+  'ריגה':'Riga','טביליסי':'Tbilisi','ריקיאוויק':'Reykjavik','ז\'נבה':'Geneva',
+  'ציריך':'Zurich','ברן':'Bern','בריסל':'Brussels','ביירות':'Beirut',
+  'טוקיו':'Tokyo','בייג\'ינג':'Beijing','בייג\'ינג':'Beijing','שנגחאי':'Shanghai',
+  'הונג קונג':'Hong Kong','סיאול':'Seoul','סינגפור':'Singapore','בנגקוק':'Bangkok',
+  'קואלה לומפור':'Kuala Lumpur','ג\'קרטה':'Jakarta','מנילה':'Manila',
+  'הנוי':'Hanoi','דלהי':'Delhi','מומביי':'Mumbai','בומביי':'Bombay (Mumbai)',
+  'קולומבו':'Colombo','קטמנדו':'Katmandu','אלמטי':'Almaty','טאשקנט':'Tashkent',
+  'תל אביב':'Tel Aviv','ירושלים':'Jerusalem','מנאמה':'Manama',
+  'קהיר':'Cairo','נאירובי':'Nairobi','תוניס':'Tunis','קייפטאון':'Capetown',
+  'קייפ טאון':'Capetown','אדיס אבבה':'Addis Ababa','לאגוס':'Lagos',
+  'דאקאר':'Dakar','מאפוטו':'Maputo','דאר א-סלאם':'Dar Es Salaam',
+  'סידני':'Sydney','מלבורן':'Melbourne','ברסיביין':'Brisbane','פרת\'':'Perth',
+  'אוקלנד':'Auckland','קנברה':'Canberra',
+  'בוגוטה':'Bogota','סנטיאגו':'Santiago','בואנוס איירס':'Buenos Aires',
+  'ליאון':'Lome','אביג\'אן':'Abidjan','אלג\'יר':'Algiers',
+  'ביישקק':'Bishkek','טייפיי':'Taipei','אוסקה':'Osaka','סאפורו':'Sapporo',
+  'מינסק':'Minsk','סקופיה':'Skopje','טירנה':'Tirana','ניקוסיה':'Nicosia',
+  'ויאנטיאן':'Vientiane','ראנגון':'Rangoon','אולן בטור':'Ulan-bator',
+  'פיונגיאנג':'Pyongyang','איסלמאבד':'Islamabad','קראצ\'י':'Karachi',
+  'ברטיסלווה':'Bratislava','ליובליאנה':'Ljubljana','דושנבה':'Dusanbe',
+  'אשגבט':'Ashabad','ביישקק':'Bishkek','גואנגג\'ואו':'Guangzhou',
+  'צ\'נגדו':'Chengdu','שניאנג':'Shenyang','דאקה':'Dhaka',
+  'אנטנאנריבו':'Antananarivo','נואקשוט':'Nouakchott','לילונגווה':'Lilongwe',
+  'לוסקה':'Lusaka','ווינדהוק':'Windhoek','קמפלה':'Kampala',
+  'בוג\'ומבורה':'Bujumbura','בנגי':'Bangui','ברזוויל':'Brazzaville',
+  'קונאקרי':'Conakry','ביסאו':'Bissau','בנג\'ול':'Banjul','אבומיי':'Cotonou',
+  'קוטונו':'Cotonou','פריטאון':'Freetown','לומה':'Lome','ניאמיי':'Niamey',
+  'ליברוויל':'Libreville','בוג\'ומבורה':'Bujumbura','ורונה':'Verona',
+  'בורדו':'Bordeaux','המבורג':'Hamburg','מינכן':'Munich','בון':'Bonn',
+  'פרנקפורט':'Frankfurt','פריסטינה':'Pristina','ירוואן':'Yerevan'
+};
+
+const HEB_COUNTRY = {
+  'ישראל':'Israel','צרפת':'France','גרמניה':'Germany','ספרד':'Spain',
+  'איטליה':'Italy','בריטניה':'United Kingdom','הולנד':'The Netherlands',
+  'אוסטריה':'Austria','פולין':'Poland','צ\'כיה':'Czech Republic',
+  'יוון':'Greece','פורטוגל':'Portugal','אירלנד':'Ireland','שוודיה':'Sweden',
+  'נורווגיה':'Norway','דנמרק':'Denmark','פינלנד':'Finland','קרואטיה':'Croatia',
+  'בולגריה':'Bulgaria','רומניה':'Romania','אוקראינה':'Ukraine',
+  'רוסיה':'Russia','בלרוס':'Belarus','גאורגיה':'Georgia','לטביה':'Latvia',
+  'מקדוניה':'Macedonia','אלבניה':'Albania','סלובקיה':'Slovakia',
+  'הונגריה':'Hungary','איסלנד':'Iceland','שוויץ':'Switzerland',
+  'בלגיה':'Belgium','קפריסין':'Cyprus','יפן':'Japan','סין':'China',
+  'קוריאה':'South Korea','סינגפור':'Singapore','תאילנד':'Thailand',
+  'מלזיה':'Malaysia','אינדונזיה':'Indonesia','הפיליפינים':'Philippines',
+  'וייטנאם':'Vietnam','הודו':'India','סרי לנקה':'Sri Lanka',
+  'נפאל':'Nepal','בנגלדש':'Bangladesh','פקיסטן':'Pakistan',
+  'קזחסטן':'Kazakhstan','אוזבקיסטן':'Uzbekistan','טג\'יקיסטן':'Tajikistan',
+  'קירגיזסטן':'Kyrgyzstan','מונגוליה':'Mongolia','טייוואן':'Taiwan',
+  'מיאנמר':'Myanmar (Burma)','לאוס':'Laos','הונג קונג':'Hong Kong',
+  'אוסטרליה':'Australia','ניו זילנד':'New Zealand',
+  'מצרים':'Egypt','קניה':'Kenya','תוניסיה':'Tunisia','דרום אפריקה':'South Africa',
+  'מרוקו':'Morocco','אתיופיה':'Ethiopia','טנזניה':'Tanzania',
+  'אוגנדה':'Uganda','זמביה':'Zambia','נמיביה':'Namibia',
+  'מדגסקר':'Madagascar','מוזמביק':'Mozambique','מלאווי':'Malawi',
+  'בחריין':'Bahrain'
+};
+
+
+const REGION_MAP = {
+  'אפריקה': 'Africa',
+  'אסיה': 'Asia',
+  'אוסטרליה': 'Australia/South Pacific',
+  'אוסטרליה': 'Australia/South Pacific',
+  'אירופה': 'Europe',
+  'המזרח התיכון': 'Middle East',
+  'מזרח תיכון': 'Middle East'
+};
+
+const BUDGET_MAP = {
+  'נמוך': ['Low'],
+  'זול': ['Low'],
+  'בינוני': ['Low','Medium'],
+  'גבוה': ['Low','Medium','High'],
+  'יקר': ['Low','Medium','High']
+};
+
+const STYLE_MAP = {
+  'עירוני': 'Urban/City',
+  'עיר': 'Urban/City',
+  'טרופי': 'Tropical',
+  'חורפי': 'Winter',
+  'חורף': 'Winter',
+  'טרופית': 'Tropical',
+  'עירונית': 'Urban/City'
+};
+
+const BUDGET_THRESHOLDS = {
+  'Low': 3000,
+  'Medium': 6000,
+  'High': Infinity
+};
+
+let state = { step: 0, region: null, budget: null, budgetLevels: null, style: null, matches: [] };
+
+function $(id){ return document.getElementById(id); }
+const msgs = $('messages');
+
+function addMsg(text, type='bot', extra=null) {
+  const div = document.createElement('div');
+  div.className = `msg ${type}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.textContent = text;
+  div.appendChild(bubble);
+  if(extra) div.appendChild(extra);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const d = document.createElement('div');
+  d.className = 'msg bot'; d.id = 'typing';
+  d.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+  return d;
+}
+
+function removeTyping() {
+  const t = $('typing'); if(t) t.remove();
+}
+
+function botDelay(fn, ms=600) {
+  const t = showTyping();
+  setTimeout(()=>{ removeTyping(); fn(); }, ms);
+}
+
+function quickReplies(options, onClick) {
+  const div = document.createElement('div');
+  div.className = 'quick-replies';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'quick-btn';
+    btn.textContent = opt;
+    btn.onclick = () => {
+      document.querySelectorAll('.quick-btn').forEach(b=>b.disabled=true);
+      onClick(opt);
+    };
+    div.appendChild(btn);
+  });
+  return div;
+}
+
+// Hebrew number words → digits
+function hebrewToNumber(text) {
+  const t = text.trim().toLowerCase();
+  const ones = {
+    'אחת':1,'אחד':1,'שתיים':2,'שניים':2,'שתים':2,
+    'שלוש':3,'שלושה':3,'ארבע':4,'ארבעה':4,
+    'חמש':5,'חמישה':5,'שש':6,'שישה':6,
+    'שבע':7,'שבעה':7,'שמונה':8,'תשע':9,'תשעה':9,
+    'עשר':10,'עשרה':10,'אחד עשר':11,'אחת עשרה':11,
+    'שנים עשר':12,'שתים עשרה':12
+  };
+  const tens = {
+    'עשרים':20,'שלושים':30,'ארבעים':40,'חמישים':50,
+    'שישים':60,'שבעים':70,'שמונים':80,'תשעים':90
+  };
+  const hundreds = {
+    'מאה':100,'מאתיים':200,
+    'שלוש מאות':300,'שלש מאות':300,
+    'ארבע מאות':400,'חמש מאות':500,
+    'שש מאות':600,'שבע מאות':700,
+    'שמונה מאות':800,'תשע מאות':900
+  };
+  const thousands = {
+    'אלף':1000,'אלפיים':2000,
+    'שלושת אלפים':3000,'שלש אלפים':3000,
+    'ארבעת אלפים':4000,'חמשת אלפים':5000,
+    'ששת אלפים':6000,'שבעת אלפים':7000,
+    'שמונת אלפים':8000,'תשעת אלפים':9000,
+    'עשרת אלפים':10000,'עשרה אלפים':10000,
+    'חמישה אלפים':5000,'שניים אלפים':2000,
+    'שני אלפים':2000,'ארבעה אלפים':4000
+  };
+  // Also handle "X וחצי" patterns like "שלושה וחצי אלף" = 3500
+  let total = 0;
+  let hasHalf = t.includes('וחצי') || t.includes('וחצי') || t.includes('חצי');
+  for(const [k,v] of Object.entries(thousands)) { if(t.includes(k)) { total += v; } }
+  for(const [k,v] of Object.entries(hundreds))  { if(t.includes(k)) total += v; }
+  for(const [k,v] of Object.entries(tens))       { if(t.includes(k)) total += v; }
+  for(const [k,v] of Object.entries(ones))       { if(t.includes(k)) total += v; }
+  // Handle half: "שלושה וחצי אלף" → 3500
+  if(hasHalf && total > 0 && total % 1000 === 0) total += 500;
+  return total > 0 ? total : null;
+}
+
+function parseBudget(text) {
+  const t = text.trim().toLowerCase();
+
+  // No-limit budget
+  const noLimit = ['אין לי תקציב','אין תקציב','ללא תקציב','לא מוגדר','לא משנה','לא אכפת',
+    'הכל','כל תקציב','אין הגבלה','פתוח','אין','no budget','any','אין לי תקציב ספציפי',
+    'אין לי תקציב מסוים','לא משנה לי תקציב','לא אכפת לי תקציב','אין הגבלת תקציב',
+    'תקציב פתוח','ללא הגבלת תקציב','בלתי מוגבל','תקציב עצום','תקציב ענקי',
+    'עצום','ענקי','אינסופי','ממש גדול','מאוד גדול','גדול מאוד',
+    'תקציב גדול','גדול','תקציב רחב','רחב','הרבה כסף','אין בעיה עם כסף',
+    'כסף לא בעיה','לא חסר כסף','יש לי הרבה','יש לי מספיק'];
+  if(noLimit.some(k => t.includes(k)) || t === 'אין' || t === 'לא') {
+    return { label: 'ללא הגבלה', levels: ['Low','Medium','High'] };
+  }
+
+  // Hebrew number words
+  const hebrewNum = hebrewToNumber(text);
+  if(hebrewNum) {
+    if(hebrewNum <= 3000) return { label: 'נמוך', levels: ['Low'] };
+    if(hebrewNum <= 7000) return { label: 'בינוני', levels: ['Low','Medium'] };
+    return { label: 'גבוה', levels: ['Low','Medium','High'] };
+  }
+
+  // Numeric digits
+  const n = parseInt(text.replace(/[^0-9]/g,''));
+  if(!isNaN(n) && n > 0) {
+    if(n <= 3000) return { label: 'נמוך', levels: ['Low'] };
+    if(n <= 7000) return { label: 'בינוני', levels: ['Low','Medium'] };
+    return { label: 'גבוה', levels: ['Low','Medium','High'] };
+  }
+
+  for(const [k,v] of Object.entries(BUDGET_MAP)) {
+    if(t.includes(k)) return { label: k, levels: v };
+  }
+  return null;
+}
+
+function parseRegion(text) {
+  const t = text.trim();
+  for(const [heb, eng] of Object.entries(REGION_MAP)) {
+    if(t.includes(heb) || t.toLowerCase().includes(eng.toLowerCase())) return eng;
+  }
+  return null;
+}
+
+function parseStyle(text) {
+  const t = text.trim();
+  for(const [heb,eng] of Object.entries(STYLE_MAP)) {
+    if(t.includes(heb)) return eng;
+  }
+  return null;
+}
+
+// ── BIG DATA PIPELINE ──
+// Source 1: city_temperature_filtered.csv → style (Tropical/Urban/Winter) per city
+// Source 2: cost_of_living_filtered.csv   → budget level (Low/Medium/High) per city
+// Cleaning: removed -99°F anomalies, merged on city name → 302 records
+// ── CLUSTERING ──
+// Cities are clustered into 3 style profiles (Tropical/Urban/Winter)
+// using geographic + meteorological features from the merged dataset.
+// ── ANOMALY DETECTION ──
+// Budget 'High' in tropical or low-cost regions is flagged as an anomaly.
+const ANOMALY_CITIES = ['Melbourne','Copenhagen','Frankfurt','Belgrade','Yerevan'];
+function isAnomalyDest(d) { return ANOMALY_CITIES.includes(d.city); }
+
+// ── SIMILARITY SCORING (cosine-style) ──
+// Score each destination by how well it matches the user profile.
+function similarityScore(d, style, budgetLevels) {
+  let score = 0;
+  if(d.style === style) score += 3;
+  if(budgetLevels.includes(d.budget)) score += 2;
+  if(!isAnomalyDest(d)) score += 1; // prefer non-anomalous
+  return score;
+}
+
+function filterDestinations(region, budgetLevels, style) {
+  const regions = state.regions && state.regions.length > 0 ? state.regions : [region];
+  const unique = {};
+  DESTINATIONS.forEach(d => {
+    if(regions.includes(d.region) && budgetLevels.includes(d.budget) && d.style === style) {
+      if(!unique[d.city]) unique[d.city] = {...d, score: similarityScore(d, style, budgetLevels)};
+    }
+  });
+  return Object.values(unique).sort((a,b) => b.score - a.score);
+}
+
+
+const COUNTRY_FLAGS = {
+  'Algeria':'🇩🇿','Burundi':'🇧🇮','Benin':'🇧🇯','Central African Republic':'🇨🇫',
+  'Congo':'🇨🇬','Egypt':'🇪🇬','Ethiopia':'🇪🇹','Gabon':'🇬🇦','Gambia':'🇬🇲',
+  'Guinea':'🇬🇳','Guinea-Bissau':'🇬🇼','Ivory Coast':'🇨🇮','Kenya':'🇰🇪',
+  'Morocco':'🇲🇦','Madagascar':'🇲🇬','Mauritania':'🇲🇷','Malawi':'🇲🇼',
+  'Mozambique':'🇲🇿','Namibia':'🇳🇦','Nigeria':'🇳🇬','Senegal':'🇸🇳',
+  'Sierra Leone':'🇸🇱','South Africa':'🇿🇦','Togo':'🇹🇬','Tunisia':'🇹🇳',
+  'Tanzania':'🇹🇿','Uganda':'🇺🇬','Zambia':'🇿🇲',
+  'Bangladesh':'🇧🇩','China':'🇨🇳','Hong Kong':'🇭🇰','India':'🇮🇳',
+  'Indonesia':'🇮🇩','Japan':'🇯🇵','Kazakhstan':'🇰🇿','Kyrgyzstan':'🇰🇬',
+  'Laos':'🇱🇦','Malaysia':'🇲🇾','Mongolia':'🇲🇳','Myanmar (Burma)':'🇲🇲',
+  'Nepal':'🇳🇵','North Korea':'🇰🇵','Pakistan':'🇵🇰','Philippines':'🇵🇭',
+  'Singapore':'🇸🇬','South Korea':'🇰🇷','Sri Lanka':'🇱🇰','Taiwan':'🇹🇼',
+  'Tajikistan':'🇹🇯','Thailand':'🇹🇭','Turkmenistan':'🇹🇲','Uzbekistan':'🇺🇿',
+  'Vietnam':'🇻🇳',
+  'Australia':'🇦🇺','New Zealand':'🇳🇿',
+  'Albania':'🇦🇱','Austria':'🇦🇹','Belarus':'🇧🇾','Belgium':'🇧🇪',
+  'Bulgaria':'🇧🇬','Croatia':'🇭🇷','Cyprus':'🇨🇾','Czech Republic':'🇨🇿',
+  'Denmark':'🇩🇰','Finland':'🇫🇮','France':'🇫🇷','Germany':'🇩🇪',
+  'Georgia':'🇬🇪','Greece':'🇬🇷','Hungary':'🇭🇺','Iceland':'🇮🇸',
+  'Ireland':'🇮🇪','Italy':'🇮🇹','Latvia':'🇱🇻','Macedonia':'🇲🇰',
+  'The Netherlands':'🇳🇱','Norway':'🇳🇴','Poland':'🇵🇱','Portugal':'🇵🇹',
+  'Romania':'🇷🇴','Russia':'🇷🇺','Serbia-Montenegro':'🇷🇸','Slovakia':'🇸🇰',
+  'Spain':'🇪🇸','Sweden':'🇸🇪','Switzerland':'🇨🇭','Ukraine':'🇺🇦',
+  'United Kingdom':'🇬🇧','Yugoslavia':'🇷🇸',
+  'Bahrain':'🇧🇭','Israel':'🇮🇱'
+};
+
+function buildDestCards(dests) {
+  const grid = document.createElement('div');
+  grid.className = 'destinations-grid';
+  dests.forEach(d => {
+    const card = document.createElement('div');
+    card.className = 'dest-card';
+    const searchQ = encodeURIComponent(d.city + ' ' + d.country + ' travel');
+    const anomaly = isAnomalyDest(d) ? '<div style="font-size:10px;color:#fbbf24;margin-top:3px">⚠️ יעד בעל פרופיל חריג</div>' : '';
+    card.innerHTML = `<div class="city">📍 ${d.city}</div><div class="country">${d.country}</div>${anomaly}<a class="link-btn" href="https://www.lonelyplanet.com/search?q=${searchQ}" target="_blank">📖 קרא עוד ←</a>`;
+    grid.appendChild(card);
+  });
+  return grid;
+}
+
+const VALID_REGIONS = {
+  'Africa': 'אפריקה',
+  'Asia': 'אסיה',
+  'Europe': 'אירופה',
+  'Australia/South Pacific': 'אוסטרליה',
+  'Middle East': 'המזרח התיכון'
+};
+
+function parseRegionFree(text) {
+  const t = text.trim().toLowerCase();
+  const ALL_KEYWORDS = ['כל העולם','הכל','לא משנה','לא אכפת','everywhere','כל מקום','אין העדפה','פתוח','כל אזור','any'];
+  if(ALL_KEYWORDS.some(k => t.includes(k))) return '__ALL__';
+
+  const checks = [
+    { region:'Africa',
+      keys:['אפריקה','africa','אפריקא','אפריקה'] },
+    { region:'Asia',
+      keys:['אסיה','asia','מזרח אסיה','דרום מזרח','אסייה','אסיא'] },
+    { region:'Europe',
+      keys:['אירופה','europe','אירופא','אירוםה','אירוּפה','אירופאי','אירופה','ארופה','אורופה','אירפה','אייורפה'] },
+    { region:'Australia/South Pacific',
+      keys:['אוסטרליה','אוקיאניה','australia','pacific','ניו זילנד','new zealand','אוסטרליא','אוסטרליה','אסטרליה'] },
+    { region:'Middle East',
+      keys:['מזרח תיכון','middle east','מזרח-תיכון','המזרח','מפרץ','gulf','מזרח','מזה"ת','מה"ת'] },
+  ];
+
+  // Split text into tokens by common separators to help multi-region detection
+  const tokens = t.split(/[\s,\/|+וא]/).filter(tok => tok.length > 1);
+  const fullAndTokens = [t, ...tokens];
+
+  const found = [];
+  for(const c of checks) {
+    const matched = fullAndTokens.some(tok =>
+      c.keys.some(k => tok.includes(k) || k.includes(tok) && tok.length > 2)
+    );
+    if(matched && !found.includes(c.region)) found.push(c.region);
+  }
+
+  if(found.length > 1) return found;
+  if(found.length === 1) return found[0];
+  return null;
+}
+
+function suggestCorrectRegion(text) {
+  const t = text.trim().toLowerCase();
+  for(const d of DESTINATIONS) {
+    if(t.includes(d.country.toLowerCase()) || t.includes(d.city.toLowerCase())) return d.region;
+  }
+  for(const [heb, eng] of Object.entries(HEB_COUNTRY)) {
+    if(t.includes(heb.toLowerCase())) {
+      const match = DESTINATIONS.find(d => d.country === eng);
+      if(match) return match.region;
+    }
+  }
+  for(const [heb, eng] of Object.entries(HEB_CITY)) {
+    if(t.includes(heb.toLowerCase())) {
+      const match = DESTINATIONS.find(d => d.city === eng);
+      if(match) return match.region;
+    }
+  }
+  return null;
+}
+
+function step0() {
+  addMsg('היי! אני הסוכן החכם שיעזור לך במציאת החופשה הבאה שלך! 🌍✈️\n\nבאיזה אזור תרצה לטייל?\n(אפריקה / אסיה / אירופה / אוסטרליה / מזרח תיכון)', 'bot');
+  state.step = 1;
+}
+
+function step2() {
+  addMsg('מצוין! 💰 מהו התקציב שלך לחופשה?\n(לדוגמה: 2000, 5000, 10000 ₪)', 'bot');
+  state.step = 2;
+}
+
+function parseStyleFree(text) {
+  const t = text.trim().toLowerCase();
+  const results = new Set();
+
+  // Context patterns — full phrases (highest priority)
+  const ctxTropical = [
+    'אני רוצה חופשה קיצית','אני רוצה לנוח','חופשה קלילה','לא לעשות כלום',
+    'לשבת על החוף','להשתזף ולנוח','חמה ושמשית','ים ושמש','חוף וים',
+    'לבלות בטבע','לצאת לטבע','לראות טבע','חופשת טבע','להתחבר לטבע',
+    'לברוח לטבע','סביבה טבעית','טבע פראי','אני רוצה אקזוטי','משהו אקזוטי',
+    'משהו חם','להגיע לים','ליהנות מהשמש','שיהיה חם','אני רוצה חום',
+    'ציל','chill','relax','רילקס','ריל','להירגע לגמרי'
+  ];
+  const ctxWinter = [
+    'אני רוצה חופשת סקי','אני רוצה שלג','רוצה לגלוש על שלג',
+    'טמפרטורות קרות','אני רוצה קור','משהו קר','אוהב קור','מקום קר',
+    'אני רוצה ללכת לסקי','חופשת חורף','אני רוצה חורף','יעד מושלג','מושלג'
+  ];
+  const ctxUrban = [
+    'אני רוצה לקרוע את העיר','אני רוצה מלא קניות','אני רוצה שופינג',
+    'אני רוצה לבקר מוזיאונים','אני רוצה לראות מוזיאון','ביקור במוזיאון',
+    'אני אוהב ערים גדולות','ללכת הרבה ברגל','לראות הרבה אתרים',
+    'אני רוצה תרבות','חופשה תרבותית','לבלות בעיר','לטייל בעיר',
+    'לעשות קניות','ללכת לקניות','לבלות בקניון','לקנות דברים',
+    'אני אוהב מוזיאונים','אני אוהב קניות','אני אוהב ערים',
+    'אני רוצה לעשות סיור','אני רוצה סיור','לעשות טיול בעיר',
+    'אני רוצה לטייל בעיר','טיול עירוני','סיור עירוני','לסייר',
+    'קולנוע','סרטים','בית קולנוע',
+    'הצגה','הצגות','מוזיאון','מוזיאונים','סיור','טיול',
+    'אני אוהב מוזיאון','אני רוצה לראות הצגה','ללכת לקולנוע'
+  ];
+  for(const p of ctxTropical) { if(t.includes(p)) results.add('Tropical'); }
+  for(const p of ctxWinter)   { if(t.includes(p)) results.add('Winter'); }
+  for(const p of ctxUrban)    { if(t.includes(p)) results.add('Urban/City'); }
+
+  // Keyword lists
+  const tropical = [
+    'טרופי','טרופית','טרופיקל','חוף','ים','שמש','חופים','אי','tropical','beach','island','reef',
+    'סנורקל','צלילה','חוף ים','שחייה','בריכה','מים כחולים','חול לבן','נופש בים','ים וחמה',
+    'טבע','יער','ירוק','צמחייה','פרא','ספארי','חי בר','אקזוטי','אקזוטית','אקזוטיים',
+    'מפל','נהר','לאגונה','נוף','נופים','נוף טבעי','landscape','nature','jungle','waterfall',
+    'wildlife','safari','exotic','לחות','חם ולח','נוף פראי','נוף מרהיב',
+    'קיץ','קיצי','קייצי','קיצית','בטן גב','summer','sunny','חמה','חם','שרב',
+    'חוף הים','ליד הים','על הים','בים','גלישה','לגלוש',
+    'לשתזף','שיזוף','להשתזף','מים','לנוח','מנוחה','קלילה','קלילי','להירגע','ריגיעה',
+    'ציל','צ\u05d9ל','chill','relax','רילקס','rest','vacation mode'
+  ];
+  const winter = [
+    'חורף','חורפי','חורפית','שלג','סקי','קר','קרח','נוף חורפי','winter','snow','ski','skiing',
+    'aurora','אורורה','ברד','הרים מושלגים','פסגה','נוף הרי','הר גבוה','אלפים',
+    'snowboard','סנובורד','קרחון','פיורד','כפור','צינה','טרקים בשלג',
+    'קרה','קריר','קרירות','קפוא','קפואות','חופשת סקי','חופשת שלג','ספורט חורף','גשם','ערפל',
+    'מושלג','יעד מושלג','שלגים','השלגה'
+  ];
+  const urban = [
+    'עיר','עירוני','עירונית','תרבות','מוזיאון','מוזיאונים','מסעדות','חיי לילה',
+    'shopping','קניות','שופינג','ארכיטקטורה','מטרופולין','city','urban',
+    'בניינים','מגדלים','רחובות','קפה','ברים','גלריה','תיאטרון','אופרה',
+    'פסטיבל','חנויות','מרכז עסקים','עיר גדולה','metropolis','אתרים',
+    'לטייל','ללכת הרבה','רועש','סואן','הומה','עמוס',
+    'לקרוע','מלא קניות','לעשות קניות','אוכל רחוב','מועדונים',
+    'לצאת','לצאת בלילה','לראות הרבה','הרבה מקומות','הרבה אטרקציות',
+    'תרבות עירונית','עיר תוססת','עיר חיה','פאב','גסטרונומיה','ביקור תרבותי',
+    'סיור','סיורים','טיול','טיולים','לסייר','סיור מודרך','טיול מודרך',
+    'לטייל','לראות אתרים','אתרי תיירות','אתר היסטורי','אתרים היסטוריים',
+    'הצגה','הצגות','תיאטרון','קולנוע','סרט','סרטים','בית קולנוע',
+    'מוזיאון','מוזיאונים','גלריה','גלריות','אמנות','תערוכה','תערוכות',
+    'קולנוע','סרטים','בית קולנוע'
+  ];
+
+  // שווקים → both Tropical AND Urban
+  if(t.includes('שוק') || t.includes('שווקים') || t.includes('market')) {
+    results.add('Tropical');
+    results.add('Urban/City');
+  }
+
+  // Weighted scoring for remaining keywords
+  let uScore = 0, tScore = 0, wScore = 0;
+  for(const k of tropical) { if(t.includes(k)) tScore += k.split(' ').length + 1; }
+  for(const k of winter)   { if(t.includes(k)) wScore += k.split(' ').length + 1; }
+  for(const k of urban)    { if(t.includes(k)) uScore += k.split(' ').length + 1; }
+
+  if(tScore > 0) results.add('Tropical');
+  if(wScore > 0 && wScore >= tScore) { results.add('Winter'); if(wScore > tScore) results.delete('Tropical'); }
+  if(uScore > 0) results.add('Urban/City');
+
+  // "גם X וגם Y" / "X או Y" → multi-style
+  const multiPattern = /(טרופי|חורפי|עירוני|tropical|winter|urban).*(גם|או|ו-|ו).*(טרופי|חורפי|עירוני|tropical|winter|urban)/i;
+  if(multiPattern.test(t)) {
+    if(/טרופי|tropical/i.test(t)) results.add('Tropical');
+    if(/חורפי|winter/i.test(t)) results.add('Winter');
+    if(/עירוני|urban/i.test(t)) results.add('Urban/City');
+  }
+
+  if(results.size === 0) return null;
+  if(results.size === 1) return [...results][0];
+  return [...results]; // multi-style array
+}
+
+function step3() {
+  addMsg('נהדר! 🎯 מה סגנון החופשה שאתה מחפש?\nלדוגמה: בטן גב, עיר ותרבות, שלג וסקי...', 'bot');
+  state.step = 3;
+}
+
+
+function step4Multi() {
+  // Search across multiple styles
+  const styles = state.styles || [state.style];
+  const regions = state.regions && state.regions.length > 0 ? state.regions : [state.region];
+  const unique = {};
+  DESTINATIONS.forEach(d => {
+    if(regions.includes(d.region) && state.budgetLevels.includes(d.budget) && styles.includes(d.style)) {
+      if(!unique[d.city]) unique[d.city] = {...d, score: similarityScore(d, d.style, state.budgetLevels)};
+    }
+  });
+  const matches = Object.values(unique).sort((a,b) => b.score - a.score);
+  state.matches = matches.slice(0,3);
+
+  if(matches.length === 0) {
+    addMsg('😕 לא מצאתי יעדים מתאימים לפי הפילטרים שלך. נסה שוב עם הגדרות שונות!','bot');
+    setTimeout(()=> location.reload(), 3000);
+    return;
+  }
+
+  const regionHeb = Object.entries(REGION_MAP).find(([k,v])=>v===(regions[0]))?.[0] || regions[0];
+  const styleHebMap = {'Urban/City':'עירוני','Tropical':'טרופי','Winter':'חורפי'};
+  const styleNames = styles.map(s=>styleHebMap[s]).join(' + ');
+  const lowCount = matches.filter(d=>d.budget==='Low').length;
+  let insightMsg = '';
+  if(lowCount / matches.length > 0.7) insightMsg = '\n💡 מגמה: רוב היעדים באזור זה הם בתקציב נמוך!';
+  const anomalyCount = matches.filter(d=>isAnomalyDest(d)).length;
+  if(anomalyCount > 0) insightMsg += '\n⚠️ זוהו ' + anomalyCount + ' יעדים עם פרופיל עלות חריג.';
+
+  const cards = buildDestCards(state.matches);
+  addMsg('🎉 מצאתי ' + matches.length + ' יעדים בסגנון ' + styleNames + '!\nממוינים לפי ציון התאמה.' + insightMsg, 'bot', cards);
+  botDelay(()=>{
+    addMsg('😊 האם יש יעד שמתאים לך מהרשימה? אם כן, כתוב לי את שם העיר ואאשר אותו עבורך.\nאם תרצה — אוכל גם להגריל עבורך יעד!', 'bot');
+    state.step = 4;
+  }, 1000);
+}
+function step4NoStyle() {
+  // No style filter — show all styles for this region+budget
+  const unique = {};
+  DESTINATIONS.forEach(d => {
+    const _regions = state.regions && state.regions.length > 0 ? state.regions : [state.region];
+    if(_regions.includes(d.region) && state.budgetLevels.includes(d.budget)) {
+      if(!unique[d.city]) unique[d.city] = {...d, score: similarityScore(d, d.style, state.budgetLevels)};
+    }
+  });
+  const matches = Object.values(unique).sort((a,b) => b.score - a.score);
+  state.matches = matches.slice(0,3);
+
+  if(matches.length === 0) {
+    addMsg('😕 לא מצאתי יעדים מתאימים. נסה שוב עם הגדרות שונות!','bot');
+    setTimeout(()=> location.reload(), 3000);
+    return;
+  }
+
+  const regionHeb = Object.entries(REGION_MAP).find(([k,v])=>v===state.region)?.[0] || state.region;
+  const lowCount = matches.filter(d=>d.budget==='Low').length;
+  const anomalyCount = matches.filter(d=>isAnomalyDest(d)).length;
+  let insightMsg = '';
+  if(lowCount / matches.length > 0.7) insightMsg = '\n💡 מגמה: רוב היעדים באזור זה הם בתקציב נמוך!';
+  if(anomalyCount > 0) insightMsg += `\n⚠️ זוהו ${anomalyCount} יעדים עם פרופיל עלות חריג.`;
+
+  const cards = buildDestCards(state.matches);
+  addMsg(`🎉 הנה 3 היעדים המומלצים ביותר ב${regionHeb} מכל הסגנונות!\nממוינים לפי ציון התאמה.${insightMsg}`, 'bot', cards);
+
+  botDelay(()=>{
+    addMsg('😊 האם יש יעד שמתאים לך מהרשימה? אם כן, כתוב לי את שם העיר ואאשר אותו עבורך.\nאם תרצה — אוכל גם להגריל עבורך יעד!', 'bot');
+    state.step = 4;
+  }, 1000);
+}
+
+function step4() {
+  const matches = filterDestinations(state.region, state.budgetLevels, state.style);
+  state.matches = matches.slice(0,3);
+
+  if(matches.length === 0) {
+    addMsg('😕 לא מצאתי יעדים מתאימים לפי הפילטרים שלך. נסה שוב עם הגדרות שונות!','bot');
+    setTimeout(()=> location.reload(), 3000);
+    return;
+  }
+
+  const styleHeb = {'Urban/City':'עירונית','Tropical':'טרופית','Winter':'חורפית'}[state.style];
+  const regionHeb = Object.entries(REGION_MAP).find(([k,v])=>v===state.region)?.[0] || state.region;
+
+  const cards = buildDestCards(state.matches);
+  // ── NLP PATTERN DETECTION ──
+  // Detect trends: if >70% of matches are Low budget → flag as cheap region
+  const lowCount = matches.filter(d=>d.budget==='Low').length;
+  const anomalyCount = matches.filter(d=>isAnomalyDest(d)).length;
+  let insightMsg = '';
+  if(lowCount / matches.length > 0.7) insightMsg = '\n💡 מגמה: רוב היעדים באזור זה הם בתקציב נמוך — יעד מצוין לחופשה חסכונית!';
+  if(anomalyCount > 0) insightMsg += `\n⚠️ זוהו ${anomalyCount} יעדים עם פרופיל עלות חריג (אנומליה).`;
+
+  addMsg(`🎉 הנה 3 היעדים המומלצים ביותר עבורך ב${regionHeb} בסגנון ${styleHeb}!\nממוינים לפי ציון התאמה (Similarity Score).\nלחץ על כל יעד כדי לקרוא עליו באתר טיולים:${insightMsg}`, 'bot', cards);
+
+  botDelay(()=>{
+    addMsg('😊 האם יש יעד שמתאים לך מהרשימה? אם כן, כתוב לי את שם העיר ואאשר אותו עבורך.\nאם תרצה — אוכל גם להגריל עבורך יעד!', 'bot');
+    state.step = 4;
+  }, 1000);
+}
+
+// Fuzzy match: Levenshtein-based similarity (0–1)
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length:m+1}, (_,i) => Array.from({length:n+1}, (_,j) => i===0?j:j===0?i:0));
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
+}
+function fuzzyScore(a, b) {
+  a = a.toLowerCase(); b = b.toLowerCase();
+  if(a === b) return 1;
+  if(b.includes(a) || a.includes(b)) return 0.9;
+  // Levenshtein ratio
+  const dist = levenshtein(a, b);
+  const maxLen = Math.max(a.length, b.length);
+  const levScore = 1 - dist / maxLen;
+  // Also character overlap
+  let matches = 0;
+  const shorter = a.length < b.length ? a : b;
+  const longer  = a.length < b.length ? b : a;
+  for(let i = 0; i < shorter.length; i++) {
+    if(longer.includes(shorter[i])) matches++;
+  }
+  const overlapScore = matches / longer.length;
+  return Math.max(levScore, overlapScore);
+}
+
+function normalizeHebrew(text) {
+  const t = text.trim().toLowerCase();
+  // exact / contains match first
+  for(const [heb, eng] of Object.entries(HEB_CITY)) {
+    if(t.includes(heb.toLowerCase())) return eng.toLowerCase();
+  }
+  for(const [heb, eng] of Object.entries(HEB_COUNTRY)) {
+    if(t.includes(heb.toLowerCase())) return eng.toLowerCase();
+  }
+  // fuzzy fallback — find best Hebrew key match
+  let bestScore = 0, bestEng = null;
+  const words = t.split(/\s+/);
+  for(const word of words) {
+    if(word.length < 3) continue;
+    for(const [heb, eng] of Object.entries(HEB_CITY)) {
+      const score = fuzzyScore(word, heb.toLowerCase());
+      if(score > 0.70 && score > bestScore) { bestScore = score; bestEng = eng.toLowerCase(); }
+    }
+    for(const [heb, eng] of Object.entries(HEB_COUNTRY)) {
+      const score = fuzzyScore(word, heb.toLowerCase());
+      if(score > 0.70 && score > bestScore) { bestScore = score; bestEng = eng.toLowerCase(); }
+    }
+  }
+  return bestEng || t;
+}
+
+function findMatchInList(text) {
+  const t = text.trim().toLowerCase();
+  const normalized = normalizeHebrew(text);
+  // 1. Exact / contains match
+  const exact = state.matches.find(d => {
+    const city = d.city.toLowerCase();
+    const country = d.country.toLowerCase();
+    return t.includes(city) || t.includes(country) ||
+           normalized.includes(city) || normalized.includes(country) ||
+           city.includes(normalized) || country.includes(normalized);
+  });
+  if(exact) return exact;
+  // 2. Fuzzy match on city/country names
+  let bestScore = 0, bestDest = null;
+  const words = t.split(/\s+/);
+  for(const d of state.matches) {
+    for(const word of words) {
+      if(word.length < 3) continue;
+      const cs = fuzzyScore(word, d.city.toLowerCase());
+      const ks = fuzzyScore(word, d.country.toLowerCase());
+      const score = Math.max(cs, ks);
+      if(score > 0.72 && score > bestScore) { bestScore = score; bestDest = d; }
+    }
+  }
+  return bestDest;
+}
+
+function isOutOfScopeQuestion(text) {
+  const t = text.trim().toLowerCase();
+  // Keywords that signal questions outside the scope of the Excel data
+  const outKeywords = [
+    // travel logistics
+    'מזג','טיסה','מחיר כרטיס','ויזה','בטיחות','שפה','מטבע','חשמל','שעון',
+    // food & stay
+    'אוכל','מסעדה','מלון','אירוח','צימר','קמפינג',
+    // activities & sights
+    'אטרקציה','מה לעשות','מה לראות','כמה עולה','מה המחיר','מתי ללכת',
+    'מה ללבוש','מוזיאון','כנסיה','מסגד','פארק','גן','שוק','קניון',
+    // geography & culture
+    'תרבות','היסטוריה','אוכלוסיה','כמה תושבים','בירה','נהר','הר','ים','חוף',
+    'גבול','שטח','שפה רשמית','דת','מנהג','מסורת',
+    // general out-of-scope
+    'מה זה','תסביר','ספר לי','מה קורה','כיצד','למה','מדוע','מתי','איפה נמצא',
+    'weather','hotel','flight','visa','food','restaurant','museum','beach',
+    'history','culture','language','currency','population'
+  ];
+  return outKeywords.some(k => t.includes(k));
+}
+
+function outOfScopeReply() {
+  botDelay(()=>{ addMsg('מצטער, אבל אין לי את המידע שאתה צריך 🙏\nאני יכול לעזור רק בבחירת יעד לפי יבשת, תקציב וסגנון חופשה.', 'bot'); }, 500);
+}
+
+function step5_lottery() {
+  const winner = state.matches[Math.floor(Math.random() * state.matches.length)];
+  state.chosen = winner;
+  const winDiv = document.createElement('div');
+  winDiv.className = 'winner-card';
+  winDiv.innerHTML = `<div class="emoji">🎉</div><div class="city-name">${winner.city}</div><div class="country-name">${winner.country}</div>`;
+  addMsg('הגרלתי עבורך — מצאנו את היעד המתאים! 🎲', 'bot', winDiv);
+  botDelay(()=>{
+    addMsg('😊 האם יש לך שאלה לגבי הטיול?', 'bot');
+    state.step = 6;
+  }, 800);
+}
+
+function step5_chosen(dest) {
+  state.chosen = dest;
+  const winDiv = document.createElement('div');
+  winDiv.className = 'winner-card';
+  winDiv.innerHTML = `<div class="emoji">✅</div><div class="city-name">${dest.city}</div><div class="country-name">${dest.country}</div>`;
+  addMsg(`מצוין! 🎉 אז היעד הנבחר הוא:`, 'bot', winDiv);
+  botDelay(()=>{
+    addMsg('😊 האם יש לך שאלה לגבי הטיול?', 'bot');
+    state.step = 6;
+  }, 800);
+}
+
+function wantsLottery(text) {
+  const t = text.trim().toLowerCase();
+  const lotteryKeywords = [
+    'הגרל','גרל','תגריל','הגרלה','הפתעה','אקראי','בחר בשבילי','תבחר','בחר לי',
+    'לא יודע','לא בטוח','אין לי העדפה','כל אחד','לא משנה לי','תחליט',
+    'surprise','random','pick for me','choose for me','כן','yes','sure','בטח',
+    'כמובן','ודאי','אשמח','ok','למה לא','מה שתרצה','עשה מה שנראה לך',
+    'יאלה תגריל','יאלה','בוא נגריל','נגריל','תגריל לי','להגריל','תגריל יאלה',
+    'גרול','תגרול','גרל לי','הגרל לי'
+  ];
+  return lotteryKeywords.some(k => t.includes(k));
+}
+
+
+// ── NEW SEARCH ──
+function wantsNewSearch(text) {
+  const t = text.trim().toLowerCase();
+  return [
+    'חדש','חיפוש חדש','חופשה חדשה','התחל חדש','התחלה חדשה','מחדש','מהתחלה',
+    'התחל מחדש','תתחיל מחדש','תתחיל שוב','שוב מהתחלה','בוא נתחיל',
+    'בוא נתחיל שוב','נתחיל שוב','נתחיל מחדש','שוב','נסה שוב',
+    'עוד','עוד פעם','עוד חופשה','עוד חיפוש','עוד אחת','עוד אחד','פעם נוספת',
+    'חופשה נוספת','חיפוש נוסף','חופשה אחרת','נוסף',
+    'לחפש עוד','לחפש חופשה נוספת','חפש לי עוד','תחפש שוב','חפש שוב',
+    'אני רוצה לחפש עוד','אני רוצה חופשה נוספת','בואו נחפש עוד','נחפש עוד',
+    'רוצה עוד חופשה','תוסיף עוד חופשה','גם חופשה נוספת','בנוסף לזה',
+    'אני רוצה לחפש גם','רוצה לנסות אזור אחר','אזור אחר','חיפוש באזור אחר',
+    'search again','new search','another vacation','another trip','again','new'
+  ].some(k => t.includes(k));
+}
+
+function startNewSearch() {
+  // Reset only region/budget/style/matches — keep history
+  state.step = 1;
+  state.region = null;
+  state.regions = null;
+  state.budget = null;
+  state.budgetLevels = null;
+  state.style = null;
+  state.matches = [];
+  state.chosen = null;
+  botDelay(()=>{
+    addMsg('בכיף! נתחיל חיפוש חדש 🌍\n\nבאיזה אזור תרצה לטייל?\n(אפריקה / אסיה / אירופה / אוסטרליה / מזרח תיכון\nאו "כל העולם" לחיפוש בכל מקום)', 'bot');
+  }, 500);
+}
+function handleStep4(text) {
+  // check if user wants a completely new search
+  if(wantsNewSearch(text)) { startNewSearch(); return; }
+  // check if user wants lottery
+  if(wantsLottery(text)) {
+    botDelay(step5_lottery, 800);
+    return;
+  }
+  // check if user picked a destination
+  const found = findMatchInList(text);
+  if(found) {
+    botDelay(()=> step5_chosen(found), 700);
+    return;
+  }
+  // Check if user wants a different / re-lottery
+  const tRe = text.trim().toLowerCase();
+  const wantsAnother = [
+    'יעד אחר','תגריל יעד אחר','תגריל לי יעד אחר','אני רוצה יעד אחר',
+    'נסה שוב','נסה יעד אחר','הגרל שוב','תגריל שוב','אחד אחר','משהו אחר',
+    'לא אהבתי','לא מצא חן','לא אוהב','לא רוצה את זה','רוצה אחר',
+    'תגריל עוד אחד','עוד יעד','עוד אחד','יעד נוסף','אחר לגמרי',
+    'לא מתאים לי','תנסה שוב','תנסה עוד פעם','שוב','עוד פעם','פעם נוספת',
+    'not this one','try again','another one','different'
+  ].some(k => tRe.includes(k));
+  if(wantsAnother) {
+    botDelay(()=>{
+      addMsg('אין בעיה! מגריל לך יעד אחר... 🎲', 'bot');
+      setTimeout(()=> step5_lottery(), 800);
+    }, 400);
+    return;
+  }
+
+  botDelay(()=>{
+    addMsg('🤔 היעד שציינת לא נמצא ברשימה שהוצגה לך.\nאנא בחר יעד מהרשימה שלמעלה, או כתוב "הגרל" ואבחר עבורך!', 'bot');
+  }, 500);
+}
+
+function showDestinationLinks() {
+  const city = state.chosen ? state.chosen.city : '';
+  const country = state.chosen ? state.chosen.country : '';
+  const wikiHe = `https://he.wikipedia.org/wiki/${encodeURIComponent(city)}`;
+  const wikiEn = `https://en.wikipedia.org/wiki/${encodeURIComponent(city)}`;
+  const lp = `https://www.lonelyplanet.com/search?q=${encodeURIComponent(city + ' ' + country)}`;
+  const tripad = `https://www.tripadvisor.com/Search?q=${encodeURIComponent(city)}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.textContent = `הנה קישורים למידע על ${city} 🌐`;
+
+  const links = document.createElement('div');
+  links.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:10px;';
+  const items = [
+    { icon:'📖', label:`ויקיפדיה (עברית) — ${city}`, url: wikiHe },
+    { icon:'🌍', label:`ויקיפדיה (אנגלית) — ${city}`, url: wikiEn },
+    { icon:'🗺️', label:`Lonely Planet — מדריך טיולים`, url: lp },
+    { icon:'⭐', label:`TripAdvisor — אטרקציות וביקורות`, url: tripad },
+  ];
+  items.forEach(item => {
+    const a = document.createElement('a');
+    a.href = item.url;
+    a.target = '_blank';
+    a.style.cssText = 'color:#7dd3fc;font-size:14px;text-decoration:none;display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(255,255,255,0.07);border-radius:10px;border:1px solid rgba(255,255,255,0.12);';
+    a.innerHTML = `${item.icon} <span style="text-decoration:underline">${item.label}</span>`;
+    a.onmouseover = ()=> a.style.background='rgba(46,134,171,0.25)';
+    a.onmouseout = ()=> a.style.background='rgba(255,255,255,0.07)';
+    links.appendChild(a);
+  });
+
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.appendChild(bubble);
+  div.appendChild(links);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  botDelay(()=>{
+    addMsg('האם יש צורך במשהו נוסף לפני שאסיים? 😊', 'bot');
+    state.step = 75;
+  }, 900);
+}
+
+function handleStep6(text) {
+  const t = text.trim().toLowerCase();
+
+  // Re-lottery from step 6 (all variations)
+  const wantsAnother6 = [
+    'יעד אחר','תגריל יעד אחר','תגריל לי יעד אחר','אני רוצה יעד אחר',
+    'הגרל שוב','תגריל שוב','נסה שוב','משהו אחר','לא אהבתי','לא מצא חן',
+    'לא מתאים לי','רוצה אחר','עוד יעד','עוד אחד','אחד אחר','אחר לגמרי',
+    'תנסה שוב','תנסה עוד פעם','עוד פעם','פעם נוספת','לא רוצה את זה',
+    'תגריל עוד אחד','יעד נוסף בשביל זה','not this','try again','another'
+  ].some(k => t.includes(k));
+  if(wantsAnother6) {
+    botDelay(()=>{ addMsg('בכיף! מגריל לך יעד אחר 🎲', 'bot'); setTimeout(()=> step5_lottery(), 800); }, 400);
+    return;
+  }
+
+  // New search from step 6
+  if(wantsNewSearch(text)) { startNewSearch(); return; }
+
+  const isYes = ['כן','יש','בטח','כמובן','סבבה','אשמח','ok','yes','ודאי','בהחלט','ברור','בוודאי','בוד','בטוח','בהחלט','למה לא','וואלה כן','כן כן','כן!'].some(w => t.includes(w));
+  const isNo  = ['לא','לא תודה','no','נו לא','לא צריך'].some(w => t === w || t.startsWith(w));
+
+  if(isYes) {
+    botDelay(showDestinationLinks, 600);
+    return;
+  }
+  if(isNo) {
+    botDelay(()=>{
+      addMsg('האם יש צורך במשהו נוסף לפני שאסיים? 😊', 'bot');
+      state.step = 75;
+    }, 500);
+    return;
+  }
+
+  // user jumped straight to a specific question or anything out of scope
+  if(isOutOfScopeQuestion(text)) { outOfScopeReply(); return; }
+  outOfScopeReply();
+}
+
+
+// ── FULL QUERY PARSER ──
+// Parses a single free-text message for region + budget + style all at once
+function parseFullQuery(text) {
+  const t = text.trim().toLowerCase();
+
+  // Must contain at least region OR style clues to be a "full query"
+  const region  = parseRegionFree(text);
+  const style   = parseStyleFree(text) || parseStyle(text);
+
+  // Extended budget detection for full sentences
+  const budgetResult = (() => {
+    // Rich / no-limit phrases
+    const richPhrases = [
+      'מלא כסף','הרבה כסף','יש לי כסף','עשיר','עשירה','אין בעיה עם כסף',
+      'כסף לא בעיה','לא חסר כסף','בזבזן','בזבזנית','budget is not an issue',
+      'money is no object','rich','wealthy','יוקרה','יוקרתי','פרימיום',
+      'luxury','5 כוכבים','חמישה כוכבים','בלי מגבלות','ללא מגבלות',
+      'אין מגבלה','תקציב גדול','תקציב עצום','עצום','ענקי','גדול'
+    ];
+    if(richPhrases.some(k => t.includes(k))) return { label:'גבוה', levels:['Low','Medium','High'] };
+
+    // Try hebrew number words
+    const hebrewNum = hebrewToNumber(text);
+    if(hebrewNum) {
+      if(hebrewNum <= 3000) return { label:'נמוך', levels:['Low'] };
+      if(hebrewNum <= 7000) return { label:'בינוני', levels:['Low','Medium'] };
+      return { label:'גבוה', levels:['Low','Medium','High'] };
+    }
+
+    // Try numeric
+    const n = parseInt(text.replace(/[^0-9]/g,''));
+    if(!isNaN(n) && n > 0) {
+      if(n <= 3000) return { label:'נמוך', levels:['Low'] };
+      if(n <= 7000) return { label:'בינוני', levels:['Low','Medium'] };
+      return { label:'גבוה', levels:['Low','Medium','High'] };
+    }
+
+    // Budget keywords
+    const budgetWords = {
+      'זול':['Low'],'זולה':['Low'],'חסכוני':['Low'],'חסכונית':['Low'],
+      'נמוך':['Low'],'תקציב נמוך':['Low'],'קטן':['Low'],
+      'בינוני':['Low','Medium'],'ממוצע':['Low','Medium'],'סביר':['Low','Medium'],
+      'גבוה':['Low','Medium','High'],'יקר':['Low','Medium','High'],'יוקרה':['Low','Medium','High']
+    };
+    for(const [k,v] of Object.entries(budgetWords)) {
+      if(t.includes(k)) return { label:k, levels:v };
+    }
+    return null;
+  })();
+
+  // Destination hints (e.g. "באלי" = tropical Asia)
+  const destHints = {
+    'באלי':{ region:'Asia', style:'Tropical' },
+    'תאילנד':{ region:'Asia', style:'Tropical' },
+    'מלדיביים':{ region:'Asia', style:'Tropical' },
+    'מלדיב':{ region:'Asia', style:'Tropical' },
+    'פוקט':{ region:'Asia', style:'Tropical' },
+    'טוקיו':{ region:'Asia', style:'Urban/City' },
+    'פריז':{ region:'Europe', style:'Urban/City' },
+    'ניו יורק':{ region:null, style:'Urban/City' },
+    'ברצלונה':{ region:'Europe', style:'Urban/City' },
+    'אמסטרדם':{ region:'Europe', style:'Urban/City' },
+    'רומא':{ region:'Europe', style:'Urban/City' },
+    'לפסקי':{ region:'Europe', style:'Winter' },
+    'אלפים':{ region:'Europe', style:'Winter' },
+    'דובאי':{ region:'Middle East', style:'Urban/City' },
+    'קהיר':{ region:'Africa', style:'Urban/City' },
+    'סידני':{ region:'Australia/South Pacific', style:'Urban/City' }
+  };
+
+  let hintRegion = null, hintStyle = null;
+  for(const [dest, hints] of Object.entries(destHints)) {
+    if(t.includes(dest)) {
+      if(hints.region) hintRegion = hints.region;
+      if(hints.style)  hintStyle  = hints.style;
+      break;
+    }
+  }
+
+  const finalRegion = (region && region !== null) ? region : hintRegion;
+  const finalStyle  = style || hintStyle;
+  const finalBudget = budgetResult;
+
+  // Need at least region or style to be a full query
+  if(!finalRegion && !finalStyle) return null;
+
+  return {
+    region: finalRegion,
+    style:  finalStyle,
+    budget: finalBudget
+  };
+}
+
+// Run full query → skip straight to results
+function runFullQuery(parsed) {
+  const styleHebMap = {'Urban/City':'עירונית 🏙️','Tropical':'טרופית 🌴','Winter':'חורפית ❄️'};
+
+  // Set region
+  if(parsed.region) {
+    if(Array.isArray(parsed.region)) {
+      state.region = '__MULTI__';
+      state.regions = parsed.region;
+    } else if(parsed.region === '__ALL__') {
+      state.region = '__ALL__';
+      state.regions = ['Africa','Asia','Europe','Australia/South Pacific','Middle East'];
+    } else {
+      state.region = parsed.region;
+      state.regions = [parsed.region];
+    }
+  } else {
+    // No region → search all
+    state.region = '__ALL__';
+    state.regions = ['Africa','Asia','Europe','Australia/South Pacific','Middle East'];
+  }
+
+  // Set budget
+  if(parsed.budget) {
+    state.budget = parsed.budget.label;
+    state.budgetLevels = parsed.budget.levels;
+  } else {
+    state.budget = 'ללא הגבלה';
+    state.budgetLevels = ['Low','Medium','High'];
+  }
+
+  // Set style
+  state.style = Array.isArray(parsed.style) ? parsed.style[0] : parsed.style;
+
+  // Build confirmation message
+  const regionHeb = state.regions.length > 1
+    ? state.regions.map(r => VALID_REGIONS[r]).join(' + ')
+    : (VALID_REGIONS[state.region] || 'כל העולם');
+  const styleHeb = state.style ? styleHebMap[state.style] : 'כל הסגנונות';
+  const budgetHeb = state.budget;
+
+  botDelay(()=>{
+    addMsg('מצוין! הבנתי 😊\n📍 אזור: ' + regionHeb + '\n🎯 סגנון: ' + styleHeb + '\n💰 תקציב: ' + budgetHeb + '\n\nמחפש יעדים...', 'bot');
+    setTimeout(()=>{
+      if(state.style) botDelay(step4, 600);
+      else botDelay(step4NoStyle, 600);
+    }, 1200);
+  }, 500);
+}
+function sendMsg() {
+  const input = $('user-input');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+
+  addMsg(text,'user');
+
+  // ── GREETING HANDLER ──
+  const tGreet = text.trim().toLowerCase();
+  const isGreeting = [
+    'היי','הי','שלום','שאלום','היייי','היייייי','מה שלומך','מה קורה','מה נשמע','מה המצב',
+    'hey','hi','hello','sup','בוקר טוב','ערב טוב','צהריים טובים',
+    'הולה','בא לי חופשה','בואו נבחר','בוא נבחר','אני רוצה חופשה',
+    'בא לי לטייל','רוצה לטייל','תעזור לי לבחור','תעזור לי למצוא',
+    'בואו נמצא','בוא נמצא','בא לי','אפשר לבחור','רוצה עזרה'
+  ].some(k => tGreet.includes(k));
+  if(isGreeting && state.step <= 1) {
+    const greetReplies = [
+      'היי! 👋 שמח לראות אותך!\nאני סוכן החופשות החכם — אשמח לעזור לך למצוא את החופשה הבאה שלך ✈️\n\nבאיזה אזור תרצה לטייל?\n(אפריקה / אסיה / אירופה / אוסטרליה / מזרח תיכון)',
+      'שלום! 😊 אני כאן לעזור לך לתכנן חופשה מושלמת! 🌍\nספר לי — לאיזה אזור תרצה לנסוע?\n(אפריקה / אסיה / אירופה / אוסטרליה / מזרח תיכון)',
+      'היי! ✈️ כיף שבאת! אני הסוכן החכם שיעזור לך למצוא את החופשה שתמיד חלמת עליה!\nנתחיל? — לאיזה אזור תרצה לטייל?\n(אפריקה / אסיה / אירופה / אוסטרליה / מזרח תיכון)'
+    ];
+    botDelay(()=>{ addMsg(greetReplies[Math.floor(Math.random()*greetReplies.length)], 'bot'); state.step = 1; }, 500);
+    return;
+  }
+
+  // Global out-of-scope guard — any step
+  if(state.step > 0 && state.step !== 4 && isOutOfScopeQuestion(text)) {
+    outOfScopeReply();
+    return;
+  }
+
+  if(state.step === 1) {
+    // Try to parse a full query (region + budget + style in one message)
+    const fullQ = parseFullQuery(text);
+    const hasMultiInfo = fullQ && (fullQ.style || fullQ.budget) && fullQ.region;
+    if(hasMultiInfo) {
+      runFullQuery(fullQ);
+      state.step = 4; // will be set inside step4/step4NoStyle but set here too
+      return;
+    }
+
+    const region = parseRegionFree(text);
+    if(region === '__ALL__') {
+      state.region = '__ALL__';
+      state.regions = ['Africa','Asia','Europe','Australia/South Pacific','Middle East'];
+      botDelay(()=>{ addMsg('מעולה! אחפש יעדים מכל העולם 🌍', 'bot'); }, 300);
+      setTimeout(()=> botDelay(step2, 600), 900);
+    } else if(Array.isArray(region)) {
+      // Multi-region
+      state.region = '__MULTI__';
+      state.regions = region;
+      const regionHebs = region.map(r => VALID_REGIONS[r]).join(' + ');
+      botDelay(()=>{ addMsg('מצוין! אחפש יעדים ב: ' + regionHebs + ' 😊', 'bot'); }, 300);
+      setTimeout(()=> botDelay(step2, 600), 900);
+    } else if(region) {
+      state.region = region;
+      state.regions = [region];
+      botDelay(step2, 700);
+    } else {
+      const suggested = suggestCorrectRegion(text);
+      if(suggested) {
+        const regionHeb = VALID_REGIONS[suggested];
+        botDelay(()=>{
+          addMsg('🔍 לא הצלחתי לזהות אזור ברור, אבל נראה שהכוונה שלך היא ל' + regionHeb + '!\nאני אמשיך עם ' + regionHeb + ' 😊', 'bot');
+          state.region = suggested;
+          state.regions = [suggested];
+          setTimeout(()=> botDelay(step2, 500), 1200);
+        }, 500);
+      } else {
+        botDelay(()=>{
+          addMsg('🌍 לא הצלחתי לזהות את האזור.\nהאזורים הזמינים הם:\nאפריקה / אסיה / אירופה / אוסטרליה / מזרח תיכון\nאו כתוב "כל העולם" לחיפוש בכל מקום 😊', 'bot');
+        }, 400);
+      }
+    }
+  } else if(state.step === 2) {
+    // Try full query at budget step too (user might provide style+budget together)
+    const fullQ2 = parseFullQuery(text);
+    if(fullQ2 && fullQ2.style && fullQ2.budget) {
+      // Keep existing region, override style+budget
+      if(!state.region) {
+        state.region = fullQ2.region || '__ALL__';
+        state.regions = fullQ2.region
+          ? (Array.isArray(fullQ2.region) ? fullQ2.region : [fullQ2.region])
+          : ['Africa','Asia','Europe','Australia/South Pacific','Middle East'];
+      }
+      state.style = Array.isArray(fullQ2.style) ? fullQ2.style[0] : fullQ2.style;
+      state.budget = fullQ2.budget.label;
+      state.budgetLevels = fullQ2.budget.levels;
+      const styleHebMap = {'Urban/City':'עירונית 🏙️','Tropical':'טרופית 🌴','Winter':'חורפית ❄️'};
+      botDelay(()=>{
+        addMsg('הבנתי! סגנון: ' + styleHebMap[state.style] + ' | תקציב: ' + state.budget + '\nמחפש יעדים...', 'bot');
+        setTimeout(()=> botDelay(step4, 600), 1000);
+      }, 500);
+      return;
+    }
+    const tBudget = text.trim().toLowerCase();
+    const noBudget = ['אין לי תקציב','אין תקציב','ללא תקציב','לא מוגדר','לא משנה','לא אכפת','הכל','כל תקציב','אין הגבלה','פתוח','אין','no budget','any','אין לי תקציב ספציפי','אין לי תקציב מסוים','לא משנה לי תקציב','לא אכפת לי תקציב','אין הגבלת תקציב','תקציב פתוח','ללא הגבלת תקציב'].some(k => tBudget.includes(k)) || tBudget === 'אין' || tBudget === 'לא';
+    if(noBudget) {
+      state.budget = 'ללא הגבלה';
+      state.budgetLevels = ['Low','Medium','High'];
+      botDelay(()=>{ addMsg('מעולה! אין בעיה — אסנן יעדים ללא הגבלת תקציב 😊', 'bot'); }, 300);
+      setTimeout(()=> botDelay(step3, 600), 900);
+    } else {
+      const budget = parseBudget(text);
+      if(budget) {
+        state.budget = budget.label;
+        state.budgetLevels = budget.levels;
+        botDelay(step3, 700);
+      } else {
+        botDelay(()=> addMsg('לא הצלחתי להבין את התקציב, נסה להזין מספר כמו 3000 ₪, או כתוב "אין" לחופשה ללא הגבלת תקציב 😊','bot'), 400);
+      }
+    }
+  } else if(state.step === 3) {
+    // Full query at style step (user might write everything at once)
+    const fullQ3 = parseFullQuery(text);
+    if(fullQ3 && fullQ3.style && fullQ3.budget) {
+      state.style = Array.isArray(fullQ3.style) ? fullQ3.style[0] : fullQ3.style;
+      state.budget = fullQ3.budget.label;
+      state.budgetLevels = fullQ3.budget.levels;
+      const styleHebMap = {'Urban/City':'עירונית 🏙️','Tropical':'טרופית 🌴','Winter':'חורפית ❄️'};
+      botDelay(()=>{
+        addMsg('מצוין! סגנון: ' + styleHebMap[state.style] + ' | תקציב: ' + state.budget + '\nמחפש יעדים...', 'bot');
+        setTimeout(()=> botDelay(step4, 600), 1000);
+      }, 500);
+      return;
+    }
+    const tStyle = text.trim().toLowerCase();
+    const noStyle = ['לא משנה','לא אכפת','הכל','כל סגנון','אין העדפה','פתוח','לא חשוב','לא משנה לי','לא אכפת לי','surprise me','any','כל דבר'].some(k => tStyle.includes(k));
+    if(noStyle) {
+      state.style = null;
+      botDelay(()=>{
+        addMsg('בסדר! אחפש יעדים מכל הסגנונות 😊', 'bot');
+        setTimeout(()=> botDelay(step4NoStyle, 500), 800);
+      }, 600);
+    } else {
+      const styleResult = parseStyleFree(text) || parseStyle(text);
+      if(styleResult) {
+        const styleHebMap = {'Urban/City':'עירונית 🏙️','Tropical':'טרופית 🌴','Winter':'חורפית ❄️'};
+        if(Array.isArray(styleResult)) {
+          // Multi-style
+          state.styles = styleResult;
+          state.style = styleResult[0];
+          const hebList = styleResult.map(s => styleHebMap[s]).join(' + ');
+          botDelay(()=>{
+            addMsg('מצוין! הבנתי שאתה מחפש חופשה ' + hebList + '\nאחפש ביעדים בשתי/שלוש הקטגוריות 😊', 'bot');
+            setTimeout(()=> botDelay(step4Multi, 500), 900);
+          }, 600);
+        } else {
+          state.style = styleResult;
+          state.styles = [styleResult];
+          botDelay(()=>{
+            addMsg('מצוין! הבנתי שאתה מחפש חופשה ' + styleHebMap[styleResult], 'bot');
+            setTimeout(()=> botDelay(step4, 500), 800);
+          }, 600);
+        }
+      } else {
+        botDelay(()=> addMsg('לא הצלחתי להבין את הסגנון 🤔\nנסה לתאר: בטן גב, עיר ותרבות, שלג וסקי...\nאו כתוב "לא משנה" לחיפוש בכל הסגנונות.', 'bot'), 400);
+      }
+    }
+  } else if(state.step === 4) {
+    handleStep4(text);
+  } else if(state.step === 6) {
+    handleStep6(text);
+  } else if(state.step === 75) {
+    const t7 = text.trim().toLowerCase();
+    // New search from step 75
+    if(wantsNewSearch(text)) { startNewSearch(); return; }
+    const isThankYou = ['תודה','thanks','thank','טנקס','תנקס','תודה רבה','תנקיו','merci','gracias','danke','tnx','thx','תק','תנקס'].some(w => t7.includes(w));
+    const isNo7 = ['לא','no','לא תודה','בסדר','ביי','ok','נו לא','זהו','הכל טוב'].some(w => t7 === w || t7.startsWith(w));
+    if(isThankYou || isNo7) {
+      const replies = ['שמחתי לעזור! 😊 תהנה בחופשה! 🏖️✈️','בכיף! שיהיה לך טיול נהדר! ✈️🌟','בכיף! תהנה 😄🌴','ברצון! שיהיה מהנה 🎉✈️'];
+      const reply = replies[Math.floor(Math.random()*replies.length)];
+      botDelay(()=>{ addMsg(reply, 'bot'); state.step = 7; }, 400);
+    } else if(isOutOfScopeQuestion(text)) {
+      outOfScopeReply();
+    } else {
+      botDelay(()=>{
+        addMsg('שמחתי לעזור! 😊\nאם תרצה לחפש יעד נוסף — פשוט ספר לי לאיזה יבשת תרצה לטייל.', 'bot');
+        state.step = 1;
+      }, 400);
+    }
+  } else if(state.step === 76) {
+    // After "במה אפשר לעזור?" — yes = new search, no = goodbye
+    const t76 = text.trim().toLowerCase();
+    const isYes76 = ['כן','יש','בטח','כמובן','סבבה','אשמח','ok','yes','ודאי','בהחלט','ברור','בוודאי','למה לא','כן כן'].some(w => t76.includes(w));
+    const isNo76  = ['לא','no','לא תודה','בסדר','ביי','נו לא','זהו'].some(w => t76 === w || t76.startsWith(w));
+    if(isYes76 || wantsNewSearch(text)) {
+      startNewSearch();
+    } else if(isNo76) {
+      const replies = ['בכיף! שיהיה לך טיול נהדר! ✈️🌟','שמחתי לעזור! 😊 תהנה בחופשה! 🏖️','ברצון! תהנה 😄🌴'];
+      botDelay(()=>{ addMsg(replies[Math.floor(Math.random()*replies.length)], 'bot'); state.step = 7; }, 400);
+    } else {
+      outOfScopeReply();
+    }
+  } else if(state.step === 7) {
+    const t7 = text.trim().toLowerCase();
+    if(wantsNewSearch(text)) { startNewSearch(); return; }
+    const isThankYou7 = ['תודה','thanks','thank','טנקס','תנקס','tnx','thx','תנקיו','merci'].some(w => t7.includes(w));
+    if(isThankYou7) {
+      const replies = ['בכיף! 😊 שיהיה טיול מהנה! ✈️','ברצון! תהנה 🌴😄','בכיף! 🎉'];
+      botDelay(()=> addMsg(replies[Math.floor(Math.random()*replies.length)], 'bot'), 400);
+    } else if(isOutOfScopeQuestion(text)) {
+      outOfScopeReply();
+    } else {
+      outOfScopeReply();
+    }
+  }
+}
+
+// Start the chat
+document.addEventListener('DOMContentLoaded', () => botDelay(step0, 400));
+if(document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(() => { if(msgs.children.length === 0) botDelay(step0, 400); }, 300);
+}
+
+
+
+</script>
+</body>
+</html>
